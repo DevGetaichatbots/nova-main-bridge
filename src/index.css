@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+/* Global button cursor styling */
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Ensure all clickable elements have pointer cursor */
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Additional interactive elements */
+input[type="file"] {
+  cursor: pointer;
+}
+
+select {
+  cursor: pointer;
+}
+
+select:disabled {
+  cursor: not-allowed;
+}
+
+/* Custom clickable divs */
+[role="button"] {
+  cursor: pointer;
+}
+/* Chat widget animations */
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
+
+.delay-100 {
+  animation-delay: 0.1s;
+}
+
+.delay-200 {
+  animation-delay: 0.2s;
+}
+
+/* Kemp & Lauritzen Green Theme Variables */
+:root {
+  --kl-green-primary: #00573c;
+  --kl-green-light: #10b981;
+  --kl-green-dark: #001a11;
+  --kl-green-accent: #059669;
+}
+
+/* Custom green-themed elements */
+.kl-green-gradient {
+  background: linear-gradient(135deg, var(--kl-green-primary) 0%, var(--kl-green-light) 100%);
+}
+
+.kl-green-text {
+  color: var(--kl-green-primary);
+}
+
+.kl-green-border {
+  border-color: var(--kl-green-primary);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body {
+  display: block;
+  /* padding-top: 80px; /* Space for fixed navbar */ 
+}
+
+/* Ensure navbar stays above all content */
+/* nav {
+  z-index: 100 !important;
+} */
+
+/* Ensure modals stay above navbar */
+.modal-overlay {
+  z-index: 9999 !important;
+}
+
+/* Global styles for App */
+.App {
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+/* ── Markdown / bot message content ─────────────────────────────────────── */
+.markdown-content {
+  line-height: 1.75;
+  color: #2d3748;
+  font-size: 0.9375rem;
+}
+.markdown-content p {
+  margin-bottom: 0.65rem;
+}
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.35rem;
+  margin-bottom: 0.65rem;
+}
+.markdown-content ul {
+  list-style-type: disc;
+}
+.markdown-content ol {
+  list-style-type: decimal;
+}
+.markdown-content li {
+  margin-bottom: 0.25rem;
+  line-height: 1.6;
+}
+.markdown-content strong {
+  color: #1c2631;
+  font-weight: 650;
+}
+.markdown-content em {
+  color: #475569;
+  font-style: italic;
+}
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  font-weight: 700;
+  color: #1c2631;
+  margin-top: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+.markdown-content h1 { font-size: 1.15rem; }
+.markdown-content h2 { font-size: 1.05rem; }
+.markdown-content h3 { font-size: 0.975rem; }
+.markdown-content code {
+  background-color: rgba(0, 214, 214, 0.12);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  font-size: 0.85rem;
+  color: #007a7a;
+}
+.markdown-content blockquote {
+  border-left: 3px solid rgba(0,214,214,0.5);
+  padding-left: 0.75rem;
+  color: #64748b;
+  margin: 0.5rem 0;
+}
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid rgba(0,214,214,0.2);
+  margin: 0.75rem 0;
+}
