@@ -331,8 +331,9 @@ def logout():
         
         if not token:
             resp = jsonify({'success': True, 'message': 'Logout successful'})
-            resp.delete_cookie('accessToken', path='/')
-            resp.delete_cookie('refreshToken', path='/api/')
+            is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
+            resp.set_cookie('accessToken', '', expires=0, path='/', samesite='None', secure=is_secure)
+            resp.set_cookie('refreshToken', '', expires=0, path='/api/', samesite='None', secure=is_secure)
             return resp, 200
 
         try:
@@ -375,19 +376,22 @@ def logout():
             )
 
             resp = jsonify({'success': True, 'message': 'Logout successful'})
-            resp.delete_cookie('accessToken', path='/')
-            resp.delete_cookie('refreshToken', path='/api/')
+            is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
+            resp.set_cookie('accessToken', '', expires=0, path='/', samesite='None', secure=is_secure)
+            resp.set_cookie('refreshToken', '', expires=0, path='/api/', samesite='None', secure=is_secure)
             return resp, 200
 
         except jwt.ExpiredSignatureError:
             resp = jsonify({'success': True, 'message': 'Logout successful'})
-            resp.delete_cookie('accessToken', path='/')
-            resp.delete_cookie('refreshToken', path='/api/')
+            is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
+            resp.set_cookie('accessToken', '', expires=0, path='/', samesite='None', secure=is_secure)
+            resp.set_cookie('refreshToken', '', expires=0, path='/api/', samesite='None', secure=is_secure)
             return resp, 200
         except jwt.InvalidTokenError:
             resp = jsonify({'success': False, 'message': 'Invalid token'})
-            resp.delete_cookie('accessToken', path='/')
-            resp.delete_cookie('refreshToken', path='/api/')
+            is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
+            resp.set_cookie('accessToken', '', expires=0, path='/', samesite='None', secure=is_secure)
+            resp.set_cookie('refreshToken', '', expires=0, path='/api/', samesite='None', secure=is_secure)
             return resp, 401
 
     except Exception as e:

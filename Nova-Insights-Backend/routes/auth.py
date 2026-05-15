@@ -167,7 +167,7 @@ def signup():
                     access_token,
                     httponly=True,
                     secure=is_secure,
-                    samesite='Lax',
+                    samesite='None',
                     max_age=86400,
                     path='/'
                 )
@@ -176,7 +176,7 @@ def signup():
                     refresh_token,
                     httponly=True,
                     secure=is_secure,
-                    samesite='Lax',
+                    samesite='None',
                     max_age=604800,
                     path='/api/'
                 )
@@ -346,7 +346,7 @@ def login():
                     access_token,
                     httponly=True,
                     secure=is_secure,
-                    samesite='Lax',
+                    samesite='None',
                     max_age=86400,
                     path='/'
                 )
@@ -355,7 +355,7 @@ def login():
                     refresh_token,
                     httponly=True,
                     secure=is_secure,
-                    samesite='Lax',
+                    samesite='None',
                     max_age=604800,
                     path='/api/'
                 )
@@ -587,7 +587,7 @@ def refresh_access_token():
                     new_access_token,
                     httponly=True,
                     secure=is_secure,
-                    samesite='Lax',
+                    samesite='None',
                     max_age=86400,
                     path='/'
                 )
