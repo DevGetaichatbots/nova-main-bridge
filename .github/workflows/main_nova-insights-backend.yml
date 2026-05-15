@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'Nova-Insights-Backend/**'
 
 jobs:
   build-and-deploy:
