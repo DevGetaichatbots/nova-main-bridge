@@ -101,8 +101,8 @@ Nova Insights is a **three-tier architecture** with clear separation of concerns
 
 | Component | Technology | Role | Hosting |
 |-----------|-----------|------|---------|
-| **Frontend** | React 19 + Vite | User interface, client-side rendering | Replit (static build served by Flask in production) |
-| **Flask Backend** | Python Flask | Auth, RBAC, DB, PDF generation, API proxy | Replit (Gunicorn, port 5000) |
+| **Frontend** | React 19 + Vite | User interface, client-side rendering | Azure App Service (static build served by Flask in production) |
+| **Flask Backend** | Python Flask | Auth, RBAC, DB, PDF generation, API proxy | Azure App Service (Gunicorn, port 8000) |
 | **Azure RAG Agent** | Python FastAPI | AI analysis, OCR, LLM orchestration | Separate Replit deployment (`nova-azure-ai-rag-agent.replit.app`) |
 
 ---
@@ -156,8 +156,8 @@ Nova Insights is a **three-tier architecture** with clear separation of concerns
 
 | Service | Purpose |
 |---------|---------|
-| Replit | Hosting (frontend + Flask backend) |
-| Replit PostgreSQL | Primary database |
+| Azure App Service | Hosting (frontend + Flask backend) |
+| Azure PostgreSQL | Primary database |
 | Upstash Redis (REST) | Caching, rate limiting, session management |
 | Azure OpenAI | LLM inference (GPT-4.1) |
 | Azure Document Intelligence | PDF OCR and table extraction |
@@ -173,7 +173,7 @@ Nova Insights is a **three-tier architecture** with clear separation of concerns
                            │  (Browser SPA)   │
                            └────────┬─────────┘
                                     │
-                          HTTPS (Replit Proxy)
+                          HTTPS (Azure App Service)
                                     │
               ┌─────────────────────▼──────────────────────┐
               │            REACT FRONTEND                   │
@@ -457,7 +457,7 @@ app.register_blueprint(update_profile_bp, url_prefix='/api')
 
 Every request passes through:
 
-1. **CORS check** — Restricted to Replit domains and localhost
+1. **CORS check** — Restricted to Azure domains and localhost
 2. **Security headers** — X-Content-Type-Options, X-Frame-Options, HSTS, etc.
 3. **JWT validation** (protected routes) — Extracts token from HttpOnly cookie, verifies signature, checks blacklist
 4. **Role authorization** — Verifies user has required role for the endpoint

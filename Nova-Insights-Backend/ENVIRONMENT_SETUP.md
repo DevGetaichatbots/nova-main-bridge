@@ -47,11 +47,11 @@ JWT_SECRET=8kF9xN2mP5wQ7vB3dE6gH1jK4lM0oR8sT2uV5yW9zA3cD7fG1hJ4kL6mN9pQ2rS5tU8vX
 - Never share JWT_SECRET in screenshots or logs
 - Use different secrets for development and production
 
-**In Replit:**
-1. Go to **Tools** → **Secrets**
-2. Add new secret: `JWT_SECRET`
+**In Azure:**
+1. Go to **Settings** → **Configuration** in the Azure Portal
+2. Add new setting: `JWT_SECRET`
 3. Paste your generated random string
-4. Click **Add Secret**
+4. Click **Save**
 
 **What Happens If Not Set:**
 - ⚠️ App will generate a random secret on startup (development only)
@@ -179,14 +179,14 @@ Full PostgreSQL connection string.
 DATABASE_URL=postgresql://username:password@host:port/database
 ```
 
-**In Replit:**
-- Automatically set when you create a PostgreSQL database
-- No manual configuration needed
-- Just use the "Database" tool in Replit
+**In Azure:**
+- Set `DATABASE_URL` in the App Service **Environment variables**
+- For Azure PostgreSQL, ensure SSL is enabled (required)
+- See "Settings → Configuration → Application settings"
 
-**Example (Replit):**
+**Example (Azure):**
 ```
-DATABASE_URL=postgresql://postgres:password@db.replit.dev:5432/file_comparison
+DATABASE_URL=postgresql://admin_root:YOUR_PASSWORD@nova-web.postgres.database.azure.com:5432/postgres?sslmode=require
 ```
 
 **Example (Azure):**
@@ -306,7 +306,7 @@ Production:   JWT_SECRET=prd_secret_789...
 - Immediately rotate if compromised
 
 ### 4. **Store Secrets Securely**
-- Use Replit Secrets (encrypted storage)
+- Use Azure App Service Configuration (encrypted storage)
 - Use environment variables
 - Never hardcode in source files
 - Never log secret values
@@ -356,7 +356,7 @@ curl http://localhost:8000/api/health
 
 **Solution:**
 1. Generate a random secret: `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`
-2. Add to Replit Secrets: `JWT_SECRET=<generated-value>`
+2. Add to Azure Configuration: `JWT_SECRET=<generated-value>`
 3. Restart backend workflow
 
 ---
@@ -366,7 +366,7 @@ curl http://localhost:8000/api/health
 
 **Solution:**
 1. Follow `GMAIL_SMTP_SETUP.md` to generate App Password
-2. Set `SMTP_EMAIL` and `SMTP_PASSWORD` in Replit Secrets
+2. Set `SMTP_EMAIL` and `SMTP_PASSWORD` in Azure Configuration
 3. Make sure App Password has NO SPACES
 4. Restart backend workflow
 
@@ -376,7 +376,7 @@ curl http://localhost:8000/api/health
 **Cause:** PostgreSQL database not running or DATABASE_URL not set
 
 **Solution:**
-1. In Replit, go to **Database** tool
+1. In Azure, configure PostgreSQL Flexible Server
 2. Create a PostgreSQL database
 3. DATABASE_URL will be auto-configured
 4. Restart backend workflow
@@ -387,7 +387,7 @@ curl http://localhost:8000/api/health
 **Cause:** JWT_SECRET changes on each restart (auto-generated)
 
 **Solution:**
-1. Set a permanent JWT_SECRET in Replit Secrets
+1. Set a permanent JWT_SECRET in Azure Configuration
 2. Never rely on auto-generated secrets in production
 
 ---
@@ -414,7 +414,7 @@ The backend checks environment variables in this order:
 
 ### For Development (Minimum)
 - [ ] Set `JWT_SECRET` (or accept auto-generated warning)
-- [ ] Database will auto-connect in Replit
+- [ ] Database will connect to Azure PostgreSQL
 
 ### For Production (Required)
 - [ ] Generate and set `JWT_SECRET` (64+ characters)

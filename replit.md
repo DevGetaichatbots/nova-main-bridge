@@ -23,9 +23,9 @@ Preferred communication style: Simple, everyday language. Communicate in English
 - **Token Storage**: HttpOnly cookies (accessToken on `/`, refreshToken on `/api/`). No tokens in localStorage or API responses.
 - **Token Blacklisting**: Redis-based token blacklisting on logout and password change. All middleware checks blacklist before accepting tokens.
 - **Security Headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, HSTS, Referrer-Policy, Permissions-Policy, Cache-Control.
-- **CORS**: Restricted to Replit domains and localhost dev servers (no wildcard).
+- **CORS**: Restricted to Azure domains and localhost dev servers (no wildcard).
 - **Rate Limiting**: Login (5/5min), Signup (5/hour), Forgot Password (3/15min), Verify OTP (5/15min), Company Registration (3/hour).
-- **Required Secrets**: JWT_SECRET, JWT_REFRESH_SECRET (app refuses to start without both).
+- **Required Environment Variables**: JWT_SECRET, JWT_REFRESH_SECRET (app refuses to start without both).
 - **Database**: PostgreSQL (for chat persistence, user data, company data, and audit logs)
 - **Roles**: guest, user, admin, company_owner, standard_user, read_only_user, super_admin.
 - **Multi-tenancy**: Supports company-based multi-tenant architecture with isolated data for users and audit logs.

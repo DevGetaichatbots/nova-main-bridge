@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 app = Flask(__name__)
 
-ALLOWED_ORIGINS = []
+ALLOWED_ORIGINS = ["https://nova-insights-frontend.azurewebsites.net"]
 replit_dev_domain = os.getenv('REPLIT_DEV_DOMAIN', '')
 if replit_dev_domain:
     ALLOWED_ORIGINS.append(f"https://{replit_dev_domain}")
@@ -61,11 +61,11 @@ if not JWT_SECRET:
     print("\nTo fix this:")
     print("1. Generate a secure random secret:")
     print("   python3 -c \"import secrets; print(secrets.token_urlsafe(48))\"")
-    print("\n2. Set it in Replit Secrets:")
-    print("   - Go to Tools → Secrets")
-    print("   - Add new secret: JWT_SECRET")
+    print("\n2. Set it in Azure App Service Configuration:")
+    print("   - Go to Settings → Configuration")
+    print("   - Add new connection string or application setting: JWT_SECRET")
     print("   - Paste the generated value")
-    print("\n3. Restart the backend workflow")
+    print("\n3. Restart the App Service")
     print("\nFor more details, see: backend/ENVIRONMENT_SETUP.md")
     print("="*70 + "\n")
     sys.exit(1)
