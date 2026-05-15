@@ -29,5 +29,7 @@ attached_assets/
 
 # NOTE: Images are now allowed so they can be deployed to Azure.
 # To ignore specific large assets, add them individually.
-canvas/
+.canvas/
+**/uploads/
+**/attached_assets/
 
