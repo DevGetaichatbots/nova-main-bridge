@@ -44,6 +44,8 @@ const preloadCriticalRoutes = () => {
   import("./components/ScheduleAnalysis");
 };
 
+import ErrorBoundary from "./components/ErrorBoundary";
+
 // Suspense fallback — matches the blue theme
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-sky-50">
@@ -2268,6 +2270,7 @@ function App() {
   return (
     <Router>
       <div className="App">
+      <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Protected Routes - Only accessible when logged in */}
@@ -2428,6 +2431,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>
+      </ErrorBoundary>
       </div>
     </Router>
   );
