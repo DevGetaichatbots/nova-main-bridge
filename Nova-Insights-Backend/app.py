@@ -16,7 +16,12 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 app = Flask(__name__)
 
-ALLOWED_ORIGINS = ["https://nova-insights-frontend.azurewebsites.net"]
+ALLOWED_ORIGINS = [
+    "https://green-beach-00b29e810.7.azurestaticapps.net",
+    "https://nova-insights-frontend.azurewebsites.net",
+    "http://localhost:5173",
+    "http://localhost:5000"
+]
 replit_dev_domain = os.getenv('REPLIT_DEV_DOMAIN', '')
 if replit_dev_domain:
     ALLOWED_ORIGINS.append(f"https://{replit_dev_domain}")
@@ -27,8 +32,6 @@ if replit_domains:
         domain = domain.strip()
         if domain:
             ALLOWED_ORIGINS.append(f"https://{domain}")
-
-ALLOWED_ORIGINS.extend(["http://localhost:5000", "http://localhost:5173"])
 
 CORS(app,
      origins=ALLOWED_ORIGINS,
