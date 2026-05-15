@@ -6,14 +6,10 @@ import OpenAI from "openai";
 
 const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
-if (!apiKey) {
-  throw new Error("VITE_OPENAI_API_KEY is not set in the .env file.");
-}
-
-const openai = new OpenAI({
+const openai = apiKey ? new OpenAI({
   apiKey: apiKey,
   dangerouslyAllowBrowser: true,
-});
+}) : null;
 
 // =================================================================
 // GUEST USER SYSTEM PROMPT - ULTRA-ADVANCED V1
@@ -214,6 +210,11 @@ File 1 [FULL_FILENAME_1] File 2 [FULL_FILENAME_2]
  */
 export const normalizeGuestApiResponse = async (rawGuestApiText) => {
   try {
+    if (!apiKey || !openai) {
+      console.warn("OpenAI API key missing for Guest Service, skipping normalization.");
+      return "PASS_THROUGH: " + rawGuestApiText;
+    }
+
     if (!rawGuestApiText || rawGuestApiText.trim().length === 0) {
       console.warn("Empty text provided to Guest AI normalizer");
       return "PASS_THROUGH: No response from API.";

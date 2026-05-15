@@ -4,14 +4,10 @@ import OpenAI from "openai";
 
 const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
-if (!apiKey) {
-  throw new Error("VITE_OPENAI_API_KEY is not set in the .env file.");
-}
-
-const openai = new OpenAI({
+const openai = apiKey ? new OpenAI({
   apiKey: apiKey,
   dangerouslyAllowBrowser: true,
-});
+}) : null;
 
 // =================================================================
 // FINAL & ADVANCED SYSTEM PROMPT V2: THE UNIVERSAL DATA ADAPTER
@@ -131,6 +127,11 @@ File 1 [filename1] File 2 [filename2]
  */
 export const normalizeApiResponse = async (rawApiText) => {
   try {
+    if (!apiKey || !openai) {
+      console.warn("OpenAI API key missing, skipping normalization.");
+      return `PASS_THROUGH: ${rawApiText}`;
+    }
+
     if (!rawApiText || rawApiText.trim().length === 0) {
       console.warn("Empty text provided to AI normalizer");
       return "PASS_THROUGH: No response from API.";
