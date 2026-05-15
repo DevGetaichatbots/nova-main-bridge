@@ -16,7 +16,7 @@ This document details all API endpoints used in Nova Insights, including authent
 
 ### Base URL
 ```
-https://nova-insights-backend.azurewebsites.net
+https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net
 ```
 
 ### 1.1 User Registration
@@ -158,7 +158,7 @@ Content-Type: application/json
 
 ### Base URL
 ```
-https://nova-insights-backend.azurewebsites.net
+https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net
 ```
 
 **Required Role:** Admin
@@ -289,7 +289,7 @@ new_session_id: "table_new_timestamp_random" (optional)
 
 ### 3.4 End Session
 
-**Endpoint:** `POST https://nova-insights-backend.azurewebsites.net/api/sessions/{sessionId}/end`
+**Endpoint:** `POST https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net/api/sessions/{sessionId}/end`
 
 **Request:**
 ```json
@@ -333,7 +333,7 @@ new_schedule: [File]
 
 ### 4.2 PDF Extraction Service (External)
 
-**Base URL:** `https://nova-insights-backend.azurewebsites.net`
+**Base URL:** `https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net`
 
 #### Submit PDF for Extraction
 

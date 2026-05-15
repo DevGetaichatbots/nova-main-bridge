@@ -1,7 +1,7 @@
 
 // Backend URL configuration
 export const getApiBaseUrl = () => {
-  return '';
+  return 'https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net';
 };
 
 export const API_ENDPOINTS = {

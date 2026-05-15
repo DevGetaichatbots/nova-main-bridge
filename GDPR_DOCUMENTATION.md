@@ -33,7 +33,7 @@ Nova Insights processes user data including authentication credentials, uploaded
 User Browser (Frontend)
         │
         ├── Auth Data ──────► External Backend (PostgreSQL)
-        │                     https://nova-insights-backend.azurewebsites.net
+        │                     https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net
         │
         ├── File Uploads ───► n8n Webhook → AI Processing
         │                     https://kasras.app.n8n.cloud/webhook/...

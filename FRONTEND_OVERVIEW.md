@@ -3,7 +3,7 @@
 **Last Updated:** December 22, 2025  
 **Version:** 2.0.0  
 **Framework:** React 19 + Vite  
-**Backend:** External Flask API (https://nova-insights-backend.azurewebsites.net)
+**Backend:** External Flask API (https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net)
 
 ---
 
@@ -130,7 +130,7 @@
 
 ### 4.1 Authentication APIs (External Backend)
 
-**Base URL:** `https://nova-insights-backend.azurewebsites.net`
+**Base URL:** `https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net`
 
 | Endpoint | Method | Purpose | Auth Required |
 |----------|--------|---------|---------------|
@@ -196,8 +196,8 @@ FormData:
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `https://nova-insights-backend.azurewebsites.net/extract-tasks` | POST | Submit PDF for extraction |
-| `https://nova-insights-backend.azurewebsites.net/status/{jobId}` | GET | Check extraction status |
+| `https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net/extract-tasks` | POST | Submit PDF for extraction |
+| `https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net/status/{jobId}` | GET | Check extraction status |
 
 ### 4.5 Support APIs
 
