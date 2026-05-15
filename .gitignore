@@ -27,11 +27,7 @@ dist-ssr
 public/uploads/
 attached_assets/
 
-# Assets and images
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.svg
-*.webp
-*.ico
+# NOTE: Images are now allowed so they can be deployed to Azure.
+# To ignore specific large assets, add them individually.
+canvas/
+
