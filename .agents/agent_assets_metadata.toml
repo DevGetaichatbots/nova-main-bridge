@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "LAdxoLHd8Cdap_JT5rqkj"
+uri = "file://DEVELOPER_GUIDE.md"
+type = "text"
+title = "Nova Insights — Developer Guide & Architecture Documentation"
