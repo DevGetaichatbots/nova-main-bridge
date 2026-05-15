@@ -25,3 +25,13 @@ dist-ssr
 
 # Uploaded files
 public/uploads/
+attached_assets/
+
+# Assets and images
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.webp
+*.ico
