@@ -14,7 +14,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 schedule_bp = Blueprint('schedule', __name__)
 
-AGENT_BASE_URL = "https://nova-azure-ai-rag-agent.replit.app"
+import os
+AGENT_BASE_URL = os.environ.get("AGENT_BASE_URL", "https://nova-azure-ai-rag-agent.replit.app")
 
 def get_current_user():
     token = None
