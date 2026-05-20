@@ -1512,8 +1512,8 @@ def download_session_pdf(session_id):
     finally:
         conn.close()
 
-import os
-AGENT_BASE_URL = os.environ.get("AGENT_BASE_URL", "https://nova-azure-ai-rag-agent.replit.app")
+
+AGENT_BASE_URL = "https://nova-ai-backend-dga5ffaudzceb0hr.japanwest-01.azurewebsites.net"
 
 @chat_bp.route('/proxy/query', methods=['POST'])
 def proxy_query():

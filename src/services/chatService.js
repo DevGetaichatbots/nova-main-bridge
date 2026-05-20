@@ -7,7 +7,7 @@ import { getApiBaseUrl } from "../utils/apiConfig.js";
 axios.defaults.timeout = 0;
 axios.defaults.maxRedirects = 10;
 
-export const AGENT_BASE_URL = import.meta.env.VITE_AGENT_BASE_URL || "https://nova-azure-ai-rag-agent.replit.app";
+export const AGENT_BASE_URL = "https://nova-ai-backend-dga5ffaudzceb0hr.japanwest-01.azurewebsites.net";
 
 class ChatService {
   generateSessionId() {
