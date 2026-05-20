@@ -14,7 +14,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 schedule_bp = Blueprint('schedule', __name__)
 
-AGENT_BASE_URL = "https://nova-azure-ai-rag-agent-fork.replit.app"
+AGENT_BASE_URL = "https://nova-azure-ai-rag-agent.replit.app"
 
 def get_current_user():
     token = None
@@ -426,7 +426,17 @@ def upload_and_analyze(analysis_id):
 
     try:
         schedule_file.seek(0)
-        mime_type = 'text/csv' if filename.lower().endswith('.csv') else 'application/pdf'
+        fn_lower = filename.lower()
+        if fn_lower.endswith('.csv'):
+            mime_type = 'text/csv'
+        elif fn_lower.endswith('.xlsx'):
+            mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        elif fn_lower.endswith('.mpp'):
+            mime_type = 'application/vnd.ms-project'
+        elif fn_lower.endswith('.xml'):
+            mime_type = 'application/xml'
+        else:
+            mime_type = 'application/pdf'
         resp = http_requests.post(
             f"{AGENT_BASE_URL}/predictive",
             files={'schedule': (filename, file_data, mime_type)},
@@ -516,3 +526,168 @@ def upload_and_analyze(analysis_id):
     except Exception as e:
         print(f"❌ Schedule analysis error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@schedule_bp.route('/analyses/<analysis_id>/v2/upload', methods=['POST'])
+def v2_upload_and_analyze(analysis_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if user.get('role') == 'read_only_user':
+        return jsonify({'success': False, 'error': 'Read-only users cannot upload files'}), 403
+
+    if 'schedule' not in request.files:
+        return jsonify({'success': False, 'error': 'No schedule file provided'}), 400
+
+    schedule_file = request.files['schedule']
+    if not schedule_file.filename:
+        return jsonify({'success': False, 'error': 'Empty filename'}), 400
+
+    language = request.form.get('language', 'en')
+    fmt = request.form.get('format', 'html')
+    filename = schedule_file.filename
+    file_data = schedule_file.read()
+    file_size = len(file_data)
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT id FROM schedule_analyses
+                WHERE analysis_id = %s AND user_id = %s
+            """, (analysis_id, user['user_id']))
+            analysis = cur.fetchone()
+            if not analysis:
+                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+
+            cur.execute("""
+                UPDATE schedule_analyses
+                SET filename = %s, file_data = %s, file_size = %s,
+                    status = 'processing', language = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE analysis_id = %s AND user_id = %s
+            """, (filename, file_data, file_size, language, analysis_id, user['user_id']))
+            conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"Error saving file for v2: {e}")
+        return jsonify({'success': False, 'error': 'Failed to save file'}), 500
+    finally:
+        conn.close()
+
+    print(f"📊 [v2/NUSF] Submitting predictive job: {filename} ({file_size} bytes)")
+
+    try:
+        fn_lower = filename.lower()
+        if fn_lower.endswith('.csv'):
+            mime_type = 'text/csv'
+        elif fn_lower.endswith('.xlsx'):
+            mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        elif fn_lower.endswith('.mpp'):
+            mime_type = 'application/vnd.ms-project'
+        elif fn_lower.endswith('.xml'):
+            mime_type = 'application/xml'
+        else:
+            mime_type = 'application/pdf'
+        resp = http_requests.post(
+            f"{AGENT_BASE_URL}/v2/predictive",
+            files={'schedule': (filename, file_data, mime_type)},
+            data={'language': language, 'format': fmt, 'analysis_id': analysis_id},
+            timeout=60,
+            verify=False,
+        )
+
+        print(f"✅ [v2/NUSF] Agent accepted job: {resp.status_code}")
+
+        if resp.status_code != 200:
+            error_msg = f'Agent returned {resp.status_code}'
+            try:
+                error_msg = resp.json().get('detail', error_msg)
+            except Exception:
+                pass
+            conn_err = get_db_connection()
+            if conn_err:
+                try:
+                    with conn_err.cursor() as cur:
+                        cur.execute("""
+                            UPDATE schedule_analyses
+                            SET status = 'error', updated_at = CURRENT_TIMESTAMP
+                            WHERE analysis_id = %s AND user_id = %s
+                        """, (analysis_id, user['user_id']))
+                        conn_err.commit()
+                    _invalidate_analyses_cache(user['user_id'])
+                    _invalidate_single_analysis_cache(analysis_id)
+                except Exception:
+                    conn_err.rollback()
+                finally:
+                    conn_err.close()
+            return jsonify({'success': False, 'error': error_msg}), 502
+
+        resp_data = resp.json()
+        return jsonify({
+            'success': True,
+            'analysis_id': resp_data.get('analysis_id', analysis_id),
+            'status': resp_data.get('status', 'processing'),
+            'pipeline': resp_data.get('pipeline', 'NUSF'),
+        })
+
+    except http_requests.exceptions.Timeout:
+        return jsonify({'success': False, 'error': 'Agent did not accept job within timeout'}), 504
+    except http_requests.exceptions.ConnectionError as e:
+        return jsonify({'success': False, 'error': 'Could not connect to the AI agent'}), 502
+    except Exception as e:
+        print(f"❌ [v2/NUSF] Upload error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@schedule_bp.route('/analyses/<analysis_id>/v2/progress', methods=['GET'])
+def v2_get_analysis_progress(analysis_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    try:
+        resp = http_requests.get(
+            f"{AGENT_BASE_URL}/v2/predictive/progress/{analysis_id}",
+            timeout=10,
+            verify=False,
+        )
+
+        if resp.status_code != 200:
+            return jsonify({'stage': 'unknown', 'message': 'Waiting...', 'step': 0, 'total_steps': 6}), 200
+
+        data = resp.json()
+
+        if data.get('stage') == 'complete':
+            result = data.get('result', {})
+            predictive_insights = result.get('predictive_insights', '')
+            if predictive_insights:
+                conn = get_db_connection()
+                if conn:
+                    try:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                UPDATE schedule_analyses
+                                SET predictive_insights = %s,
+                                    status = 'completed',
+                                    updated_at = CURRENT_TIMESTAMP
+                                WHERE analysis_id = %s AND user_id = %s
+                            """, (predictive_insights, analysis_id, user['user_id']))
+                            conn.commit()
+                        _invalidate_analyses_cache(user['user_id'])
+                        _invalidate_single_analysis_cache(analysis_id)
+                    except Exception as db_err:
+                        print(f"❌ [v2/NUSF] DB save error: {db_err}")
+                        conn.rollback()
+                    finally:
+                        conn.close()
+
+        return jsonify(data)
+
+    except Exception as e:
+        print(f"❌ [v2/NUSF] Progress poll error: {e}")
+        return jsonify({'stage': 'unknown', 'message': 'Waiting...', 'step': 0, 'total_steps': 6}), 200

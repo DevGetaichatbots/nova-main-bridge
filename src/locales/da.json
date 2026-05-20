@@ -438,8 +438,9 @@
     "dragDropSecond": "Træk ny tidsplan hertil",
     "or": "eller",
     "browse": "Gennemse",
-    "fileTypeError": "Kun PDF, DOC, DOCX, TXT og CSV filer er tilladt",
-    "invalidFileType": "Ugyldig filtype: \"{{fileName}}\". Kun PDF, DOC, DOCX, TXT og CSV filer er tilladt.",
+    "fileTypeError": "Kun PDF, DOC, DOCX, TXT, CSV, XLSX, MPP og XML filer er tilladt",
+    "invalidFileType": "Ugyldig filtype: \"{{fileName}}\". Kun PDF, DOC, DOCX, TXT, CSV, XLSX, MPP og XML filer er tilladt.",
+    "mppRequiresV2": "MPP-filer kræver, at NUSF v2-tjenesten er aktiveret. Slå venligst NUSF v2 til ovenfor før upload.",
     "csvRowLimit": "CSV-filen har {{count}} rækker, hvilket overstiger maksimum på {{max}} rækker. Reducer venligst filstørrelsen.",
     "noFileSelected": "Ingen fil valgt",
     "selectedFile": "Valgt fil",
@@ -453,7 +454,7 @@
     "uploadFailed": "Upload af filer mislykkedes",
     "uploadFailedRetry": "Upload af filer mislykkedes. Prøv venligst igen.",
     "uploadBothFilesPrompt": "Upload venligst begge filer for at starte chat sessionen",
-    "fileTypesSupported": "PDF, DOC, DOCX, TXT, CSV understøttes (CSV maks 3.000 rækker pr. fil)",
+    "fileTypesSupported": "PDF, DOC, DOCX, TXT, CSV, XLSX, MPP, XML understøttes (CSV maks 3.000 rækker pr. fil)",
     "uploadBothButton": "Upload begge filer",
     "startComparison": "Start Sammenligning",
     "bothFilesSelected": "Begge filer valgt! Klik \"Start Sammenligning\" for at begynde."
@@ -1070,17 +1071,17 @@
     },
     "welcome": {
       "title": "Schedule Risk",
-      "subtitle": "Upload en PDF-tidsplan for at identificere forsinkede aktiviteter og få en omfattende risikorapport.",
+      "subtitle": "Upload en tidsplanfil for at identificere forsinkede aktiviteter og få en omfattende risikorapport.",
       "newAnalysis": "Ny Analyse",
-      "step1": "Upload en tidsplan-PDF",
+      "step1": "Upload en tidsplanfil",
       "step2": "AI analyserer forsinkelser",
       "step3": "Få detaljeret rapport"
     },
     "upload": {
       "title": "Upload Tidsplan",
-      "subtitle": "Træk din tidsplan-PDF hertil eller klik for at gennemse",
-      "button": "Vælg PDF-fil",
-      "hint": "PDF- og CSV-filer understøttes (CSV maks 5.000 rækker). Referencedatoen udtrækkes fra filnavnet."
+      "subtitle": "Træk din tidsplan hertil eller klik for at gennemse",
+      "button": "Vælg fil",
+      "hint": "PDF-, CSV-, XLSX-, MPP- og XML-filer understøttes (CSV maks 5.000 rækker). Referencedatoen udtrækkes fra filnavnet."
     },
     "processing": {
       "title": "Analyserer Tidsplan",
@@ -1102,7 +1103,7 @@
       "downloadPdf": "Download PDF"
     },
     "errors": {
-      "pdfOnly": "Kun PDF- og CSV-filer understøttes. Vælg venligst en gyldig fil.",
+      "pdfOnly": "Kun PDF-, CSV-, XLSX-, MPP- og XML-filer understøttes. Vælg venligst en gyldig fil.",
       "csvRowLimit": "CSV-filen har {{count}} rækker, hvilket overstiger maksimum på {{max}} rækker. Reducer venligst filstørrelsen.",
       "failed": "Analysen mislykkedes. Prøv venligst igen.",
       "pdfFailed": "Kunne ikke downloade PDF. Prøv venligst igen."

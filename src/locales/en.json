@@ -438,8 +438,9 @@
     "dragDropSecond": "Drag new schedule here",
     "or": "or",
     "browse": "Browse",
-    "fileTypeError": "Only PDF, DOC, DOCX, TXT, and CSV files are allowed",
-    "invalidFileType": "Invalid file type: \"{{fileName}}\". Only PDF, DOC, DOCX, TXT, and CSV files are allowed.",
+    "fileTypeError": "Only PDF, DOC, DOCX, TXT, CSV, XLSX, MPP, and XML files are allowed",
+    "invalidFileType": "Invalid file type: \"{{fileName}}\". Only PDF, DOC, DOCX, TXT, CSV, XLSX, MPP, and XML files are allowed.",
+    "mppRequiresV2": "MPP files require the NUSF v2 toggle to be enabled. Please turn on NUSF v2 above before uploading.",
     "csvRowLimit": "CSV file has {{count}} rows, which exceeds the maximum of {{max}} rows. Please reduce the file size.",
     "noFileSelected": "No file selected",
     "selectedFile": "Selected file",
@@ -453,7 +454,7 @@
     "uploadFailed": "File upload failed",
     "uploadFailedRetry": "File upload failed. Please try again.",
     "uploadBothFilesPrompt": "Please upload both files to start the chat session",
-    "fileTypesSupported": "PDF, DOC, DOCX, TXT, CSV supported (CSV max 3,000 rows per file)",
+    "fileTypesSupported": "PDF, DOC, DOCX, TXT, CSV, XLSX, MPP, XML supported (CSV max 3,000 rows per file)",
     "uploadBothButton": "Upload both files",
     "startComparison": "Start Comparison",
     "bothFilesSelected": "Both files selected! Click \"Start Comparison\" to begin."
@@ -1068,17 +1069,17 @@
     },
     "welcome": {
       "title": "Schedule Risk",
-      "subtitle": "Upload a construction schedule PDF to identify delayed activities and get a comprehensive risk report.",
+      "subtitle": "Upload a construction schedule file to identify delayed activities and get a comprehensive risk report.",
       "newAnalysis": "New Analysis",
-      "step1": "Upload a schedule PDF",
+      "step1": "Upload a schedule file",
       "step2": "AI analyzes delays",
       "step3": "Get detailed report"
     },
     "upload": {
       "title": "Upload Schedule",
-      "subtitle": "Drop your construction schedule PDF here or click to browse",
-      "button": "Select PDF File",
-      "hint": "PDF and CSV files supported (CSV max 5,000 rows). The reference date is extracted from the filename."
+      "subtitle": "Drop your construction schedule here or click to browse",
+      "button": "Select File",
+      "hint": "PDF, CSV, XLSX, MPP and XML files supported (CSV max 5,000 rows). The reference date is extracted from the filename."
     },
     "processing": {
       "title": "Analyzing Schedule",
@@ -1100,7 +1101,7 @@
       "downloadPdf": "Download PDF"
     },
     "errors": {
-      "pdfOnly": "Only PDF and CSV files are supported. Please select a valid file.",
+      "pdfOnly": "Only PDF, CSV, XLSX, MPP and XML files are supported. Please select a valid file.",
       "csvRowLimit": "CSV file has {{count}} rows, which exceeds the maximum of {{max}} rows. Please reduce the file size.",
       "failed": "Analysis failed. Please try again.",
       "pdfFailed": "Failed to download PDF. Please try again."

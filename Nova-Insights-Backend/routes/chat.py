@@ -50,10 +50,12 @@ def init_chat_tables():
                     status VARCHAR(20) DEFAULT 'active',
                     old_session_id VARCHAR(50),
                     new_session_id VARCHAR(50),
+                    pipeline VARCHAR(20) DEFAULT 'v1',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_activity_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+                ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS pipeline VARCHAR(20) DEFAULT 'v1';
                 
                 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id ON chat_sessions(user_id);
                 CREATE INDEX IF NOT EXISTS idx_chat_sessions_company_id ON chat_sessions(company_id);
@@ -1511,7 +1513,7 @@ def download_session_pdf(session_id):
         conn.close()
 
 
-AGENT_BASE_URL = "https://nova-azure-ai-rag-agent-fork.replit.app"
+AGENT_BASE_URL = "https://nova-azure-ai-rag-agent.replit.app"
 
 @chat_bp.route('/proxy/query', methods=['POST'])
 def proxy_query():
@@ -1525,8 +1527,27 @@ def proxy_query():
         language = request.form.get('language', 'da')
         old_session_id = request.form.get('old_session_id', 'none')
         new_session_id = request.form.get('new_session_id', 'none')
-        
-        print(f"🔄 Proxying query to Azure agent: {query[:80]}...")
+
+        pipeline = 'v1'
+        if vs_table:
+            conn_pl = get_db_connection()
+            if conn_pl:
+                try:
+                    with conn_pl.cursor() as cur:
+                        cur.execute(
+                            "SELECT pipeline FROM chat_sessions WHERE session_id = %s AND user_id = %s",
+                            (vs_table, user['user_id'])
+                        )
+                        row = cur.fetchone()
+                        if row:
+                            pipeline = row['pipeline'] or 'v1'
+                except Exception:
+                    pass
+                finally:
+                    conn_pl.close()
+
+        agent_endpoint = '/v2/query' if pipeline == 'nusf_v2' else '/query'
+        print(f"🔄 Proxying query to Azure agent [{pipeline}] {agent_endpoint}: {query[:80]}...")
         print(f"🔑 vs_table: {vs_table}, old: {old_session_id}, new: {new_session_id}")
         
         form_data = {
@@ -1538,7 +1559,7 @@ def proxy_query():
         }
         
         resp = http_requests.post(
-            f"{AGENT_BASE_URL}/query",
+            f"{AGENT_BASE_URL}{agent_endpoint}",
             data=form_data,
             timeout=300,
             verify=False,
@@ -1623,4 +1644,136 @@ def proxy_upload_progress(upload_id):
         return jsonify(resp.json())
     except Exception as e:
         print(f"❌ Proxy progress error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@chat_bp.route('/proxy/v2/upload', methods=['POST'])
+def proxy_v2_upload():
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    try:
+        files = {}
+        for key in request.files:
+            f = request.files[key]
+            files[key] = (f.filename, f.stream, f.content_type)
+
+        form_data = {}
+        for key in request.form:
+            form_data[key] = request.form[key]
+
+        print(f"🔄 [v2/NUSF] Proxying upload to Azure agent with {len(files)} file(s)")
+        print(f"📎 File keys: {list(files.keys())}")
+
+        resp = http_requests.post(
+            f"{AGENT_BASE_URL}/v2/upload",
+            files=files,
+            data=form_data,
+            timeout=300,
+            verify=False,
+        )
+
+        print(f"✅ [v2/NUSF] Azure agent upload responded: {resp.status_code}")
+        resp_data = resp.json()
+        print(f"📥 [v2/NUSF] Response: {resp_data}")
+
+        if resp.status_code != 200:
+            if resp.status_code == 404:
+                return jsonify({'success': False, 'error': 'NUSF_V2_UNAVAILABLE'}), 503
+            return jsonify({'success': False, 'error': f'Agent returned {resp.status_code}'}), 502
+
+        chat_session_id = form_data.get('session_id')
+        if chat_session_id:
+            conn_upd = get_db_connection()
+            if conn_upd:
+                try:
+                    with conn_upd.cursor() as cur:
+                        cur.execute("""
+                            UPDATE chat_sessions SET pipeline = 'nusf_v2', updated_at = CURRENT_TIMESTAMP
+                            WHERE session_id = %s AND user_id = %s
+                        """, (chat_session_id, user['user_id']))
+                        conn_upd.commit()
+                        print(f"✅ [v2/NUSF] Session {chat_session_id} marked as nusf_v2 pipeline")
+                except Exception as db_err:
+                    print(f"⚠️ [v2/NUSF] Could not stamp pipeline on session: {db_err}")
+                    conn_upd.rollback()
+                finally:
+                    conn_upd.close()
+
+        return jsonify(resp_data)
+    except http_requests.exceptions.Timeout:
+        return jsonify({'success': False, 'error': 'Upload timed out after 5 minutes'}), 504
+    except Exception as e:
+        print(f"❌ [v2/NUSF] Proxy upload error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@chat_bp.route('/proxy/v2/upload/progress/<upload_id>', methods=['GET'])
+def proxy_v2_upload_progress(upload_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    try:
+        resp = http_requests.get(
+            f"{AGENT_BASE_URL}/v2/upload/progress/{upload_id}",
+            timeout=30,
+            verify=False,
+        )
+
+        if resp.status_code != 200:
+            return jsonify({'success': False, 'error': f'Agent returned {resp.status_code}'}), resp.status_code
+
+        return jsonify(resp.json())
+    except Exception as e:
+        print(f"❌ [v2/NUSF] Proxy v2 progress error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@chat_bp.route('/proxy/v2/query', methods=['POST'])
+def proxy_v2_query():
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    try:
+        query = request.form.get('query', '')
+        vs_table = request.form.get('vs_table', '')
+        language = request.form.get('language', 'da')
+        old_session_id = request.form.get('old_session_id', 'none')
+        new_session_id = request.form.get('new_session_id', 'none')
+
+        print(f"🔄 [v2/NUSF] Proxying query to Azure v2/query: {query[:80]}...")
+        print(f"🔑 vs_table: {vs_table}, old: {old_session_id}, new: {new_session_id}")
+
+        form_data = {
+            'query': query,
+            'vs_table': vs_table,
+            'language': language,
+            'old_session_id': old_session_id,
+            'new_session_id': new_session_id,
+        }
+
+        resp = http_requests.post(
+            f"{AGENT_BASE_URL}/v2/query",
+            data=form_data,
+            timeout=300,
+            verify=False,
+        )
+
+        print(f"✅ [v2/NUSF] Azure agent v2/query responded: {resp.status_code}")
+
+        if resp.status_code != 200:
+            return jsonify({'success': False, 'error': f'Agent returned {resp.status_code}'}), 502
+
+        return jsonify(resp.json())
+    except http_requests.exceptions.Timeout:
+        print("⏰ [v2/NUSF] Azure agent v2/query timed out")
+        return jsonify({'success': False, 'error': 'Query timed out after 5 minutes.'}), 504
+    except http_requests.exceptions.ConnectionError as e:
+        print(f"🔌 [v2/NUSF] Azure agent v2/query connection error: {e}")
+        return jsonify({'success': False, 'error': 'Could not connect to the AI agent. Please try again.'}), 502
+    except Exception as e:
+        print(f"❌ [v2/NUSF] Proxy v2 query error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -379,6 +379,81 @@ pdf: [PDF File]
 
 ---
 
+### 4.3 NUSF V2 Pipeline Proxy APIs
+
+These endpoints proxy requests to the next-generation NUSF v2 pipeline on the AI agent.
+
+#### Chat Session V2 File Upload
+* **Endpoint:** `POST /proxy/v2/upload`
+* **Multipart FormData:**
+  * `session_id`: "session_abc123..."
+  * `files` or individual file inputs
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "upload_id": "upload_v2_abc123..."
+  }
+  ```
+
+#### Chat Session V2 Upload Progress
+* **Endpoint:** `GET /proxy/v2/upload/progress/{uploadId}`
+* **Response (200 OK):**
+  ```json
+  {
+    "stage": "processing",
+    "progress": 45,
+    "message": "Extracting text..."
+  }
+  ```
+
+#### Chat Session V2 Query
+* **Endpoint:** `POST /proxy/v2/query`
+* **Request (FormData):**
+  * `query`: "Search query string"
+  * `vs_table`: "session_abc123..."
+  * `language`: "da" | "en"
+* **Response (200 OK):**
+  ```json
+  {
+    "output": "AI generated response content",
+    "isHtmlTable": false
+  }
+  ```
+
+#### Schedule Analysis V2 File Upload
+* **Endpoint:** `POST /analyses/{analysis_id}/v2/upload`
+* **Multipart FormData:**
+  * `schedule`: [File] (.xlsx, .mpp, .xml, .csv)
+  * `language`: "da" | "en"
+  * `format`: "html"
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "analysis_id": "sa_abc123...",
+    "status": "processing",
+    "pipeline": "NUSF"
+  }
+  ```
+
+#### Schedule Analysis V2 Progress & Results
+* **Endpoint:** `GET /analyses/{analysis_id}/v2/progress`
+* **Response (200 OK):**
+  ```json
+  {
+    "stage": "complete",
+    "message": "Analysis ready",
+    "step": 6,
+    "total_steps": 6,
+    "result": {
+      "predictive_insights": "..."
+    }
+  }
+  ```
+
+---
+
 ## 5. Support APIs
 
 ### 5.1 WhatsApp Notification (WAAPI)

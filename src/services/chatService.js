@@ -7,7 +7,7 @@ import { getApiBaseUrl } from "../utils/apiConfig.js";
 axios.defaults.timeout = 0;
 axios.defaults.maxRedirects = 10;
 
-export const AGENT_BASE_URL = "https://nova-azure-ai-rag-agent-fork.replit.app";
+export const AGENT_BASE_URL = "https://nova-azure-ai-rag-agent.replit.app";
 
 class ChatService {
   generateSessionId() {
@@ -391,6 +391,95 @@ class ChatService {
       console.error("❌ Error downloading message PDF:", error);
       throw error;
     }
+  }
+
+  async uploadFilesV2(oldScheduleFile, newScheduleFile, sessionId) {
+    const backendUrl = getApiBaseUrl();
+    const uploadUrl = `${backendUrl}/api/chat/proxy/v2/upload`;
+
+    const oldSessionId = this.generateTableSessionId("old");
+    const newSessionId = this.generateTableSessionId("new");
+
+    const formData = new FormData();
+    formData.append("session_id", sessionId);
+    formData.append("old_session_id", oldSessionId);
+    formData.append("old_schedule", oldScheduleFile);
+    formData.append("new_session_id", newSessionId);
+    formData.append("new_schedule", newScheduleFile);
+
+    console.log("📤 [v2/NUSF] Uploading files via v2 proxy...");
+
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("📥 [v2/NUSF] Upload response:", data);
+
+    return {
+      uploadId: data.upload_id,
+      sessionId,
+      oldSessionId,
+      newSessionId,
+    };
+  }
+
+  pollV2UploadProgress(uploadId, onProgress, onComplete, onError, onPollError) {
+    const backendUrl = getApiBaseUrl();
+    const PROGRESS_URL = `${backendUrl}/api/chat/proxy/v2/upload/progress/${uploadId}`;
+    let attempts = 0;
+    const maxAttempts = 180;
+    let consecutiveErrors = 0;
+    let timerId = null;
+    let stopped = false;
+
+    const poll = async () => {
+      if (stopped) return;
+      try {
+        const res = await fetch(PROGRESS_URL, { credentials: "include" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        console.log(
+          `📊 [v2/NUSF] Poll [${attempts + 1}]:`,
+          JSON.stringify(data),
+        );
+
+        consecutiveErrors = 0;
+        onProgress(data);
+
+        if (data.status === "complete") {
+          onComplete(data);
+          return;
+        } else if (data.status === "failed" || data.status === "error") {
+          onError(new Error(data.message || "Upload processing failed"));
+          return;
+        }
+      } catch (err) {
+        consecutiveErrors++;
+        console.warn(`📊 [v2/NUSF] Poll error [${attempts + 1}]:`, err.message);
+        if (onPollError) onPollError(err, consecutiveErrors);
+      }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        timerId = setTimeout(poll, 2000);
+      } else {
+        onError(new Error("Upload timed out after 6 minutes"));
+      }
+    };
+
+    timerId = setTimeout(poll, 500);
+    return () => {
+      stopped = true;
+      if (timerId) clearTimeout(timerId);
+    };
   }
 }
 

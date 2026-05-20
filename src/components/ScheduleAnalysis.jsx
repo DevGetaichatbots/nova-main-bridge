@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import DOMPurify from 'dompurify';
 import { scheduleService } from '../services/scheduleService';
 import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
+import NusfToggle from './NusfToggle';
 
 const SCHEDULE_NAV_SECTIONS = [
   { id: 'predictive-schedule-outlook',      labelEn: 'Schedule Outlook',       labelDa: 'Tidsplan Udsigt' },
@@ -38,8 +39,11 @@ const ScheduleAnalysis = ({ user }) => {
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [navSections, setNavSections] = useState([]);
   const [activeSectionId, setActiveSectionId] = useState(null);
+  const [useNusf, setUseNusf] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);
   const fileInputRef = useRef(null);
   const progressPollRef = useRef(null);
+  const isV2RunningRef = useRef(false);
   const reportContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const observerRef = useRef(null);
@@ -64,6 +68,8 @@ const ScheduleAnalysis = ({ user }) => {
   }, [loadAnalyses]);
 
   useEffect(() => {
+    setPendingFile(null);
+    setUseNusf(false);
     if (!activeAnalysisId) {
       setActiveAnalysis(null);
       setIsLoadingAnalysis(false);
@@ -105,6 +111,7 @@ const ScheduleAnalysis = ({ user }) => {
     }
 
     const pollProgress = async () => {
+      if (isV2RunningRef.current) return;
       try {
         const data = await scheduleService.getProgress(activeAnalysisId);
         if (data && data.stage && data.stage !== 'unknown' && data.step > 0) {
@@ -311,7 +318,7 @@ const ScheduleAnalysis = ({ user }) => {
   const handleFileUpload = async (file) => {
     if (!activeAnalysisId || isProcessing) return;
     const ext = file.name.toLowerCase();
-    if (!ext.endsWith('.pdf') && !ext.endsWith('.csv')) {
+    if (!ext.endsWith('.pdf') && !ext.endsWith('.csv') && !ext.endsWith('.xlsx') && !ext.endsWith('.mpp') && !ext.endsWith('.xml')) {
       setError(t('scheduleAnalysis.errors.pdfOnly'));
       return;
     }
@@ -334,36 +341,106 @@ const ScheduleAnalysis = ({ user }) => {
 
     try {
       const lang = i18n.language?.substring(0, 2) || 'en';
-      const data = await scheduleService.uploadAndAnalyze(activeAnalysisId, file, lang);
 
-      if (data.success) {
-        setProgressData({ stage: 'complete', message: t('scheduleAnalysis.progress.complete'), step: 6, total_steps: 6 });
-        await new Promise(r => setTimeout(r, 800));
-        setActiveAnalysis(prev => {
-          const updated = {
-            ...prev,
-            status: 'completed',
-            filename: file.name,
-            predictive_insights: data.predictive_insights,
-            processing_time: data.processing_time_seconds,
-            model: data.predictive_model,
-            reference_date: data.reference_date,
+      if (useNusf) {
+        isV2RunningRef.current = true;
+        await scheduleService.uploadAndAnalyzeV2(activeAnalysisId, file, lang);
+
+        await new Promise((resolve, reject) => {
+          let attempts = 0;
+          const maxAttempts = 200;
+          let timerId;
+
+          const poll = async () => {
+            try {
+              const progress = await scheduleService.pollV2Progress(activeAnalysisId);
+              if (progress.stage && progress.stage !== 'unknown' && progress.step > 0) {
+                setProgressData(progress);
+              }
+              if (progress.stage === 'complete') {
+                clearTimeout(timerId);
+                resolve();
+                return;
+              }
+              if (progress.stage === 'error') {
+                clearTimeout(timerId);
+                reject(new Error(progress.message || t('scheduleAnalysis.errors.failed')));
+                return;
+              }
+            } catch (_e) {}
+            attempts++;
+            if (attempts < maxAttempts) {
+              timerId = setTimeout(poll, 2500);
+            } else {
+              reject(new Error('Analysis timed out. Please try again.'));
+            }
           };
-          analysisCacheRef.current[activeAnalysisId] = updated;
-          return updated;
+
+          timerId = setTimeout(poll, 2500);
         });
-        await loadAnalyses();
+
+        const fetchedData = await scheduleService.getAnalysis(activeAnalysisId);
+        if (fetchedData.success && fetchedData.analysis?.predictive_insights) {
+          setProgressData({ stage: 'complete', message: t('scheduleAnalysis.progress.complete'), step: 6, total_steps: 6 });
+          await new Promise(r => setTimeout(r, 800));
+          setActiveAnalysis(prev => {
+            const updated = {
+              ...prev,
+              status: 'completed',
+              filename: fetchedData.analysis.filename || file.name,
+              predictive_insights: fetchedData.analysis.predictive_insights,
+              processing_time: fetchedData.analysis.processing_time,
+              model: fetchedData.analysis.model,
+              reference_date: fetchedData.analysis.reference_date,
+            };
+            analysisCacheRef.current[activeAnalysisId] = updated;
+            return updated;
+          });
+          await loadAnalyses();
+        } else {
+          throw new Error(fetchedData.error || t('scheduleAnalysis.errors.failed'));
+        }
+
       } else {
-        setError(data.error || t('scheduleAnalysis.errors.failed'));
-        setActiveAnalysis(prev => ({ ...prev, status: 'error' }));
+        const data = await scheduleService.uploadAndAnalyze(activeAnalysisId, file, lang);
+
+        if (data.success) {
+          setProgressData({ stage: 'complete', message: t('scheduleAnalysis.progress.complete'), step: 6, total_steps: 6 });
+          await new Promise(r => setTimeout(r, 800));
+          setActiveAnalysis(prev => {
+            const updated = {
+              ...prev,
+              status: 'completed',
+              filename: file.name,
+              predictive_insights: data.predictive_insights,
+              processing_time: data.processing_time_seconds,
+              model: data.predictive_model,
+              reference_date: data.reference_date,
+            };
+            analysisCacheRef.current[activeAnalysisId] = updated;
+            return updated;
+          });
+          await loadAnalyses();
+        } else {
+          setError(data.error || t('scheduleAnalysis.errors.failed'));
+          setActiveAnalysis(prev => ({ ...prev, status: 'error' }));
+        }
       }
     } catch (err) {
       console.error('Upload/analyze error:', err);
       setError(err.message || t('scheduleAnalysis.errors.failed'));
       setActiveAnalysis(prev => prev ? { ...prev, status: 'error' } : prev);
     } finally {
+      isV2RunningRef.current = false;
       setIsProcessing(false);
       setProgressData({ stage: '', message: '', step: 0, total_steps: 6 });
+    }
+  };
+
+  const handleStartAnalysis = () => {
+    if (pendingFile) {
+      handleFileUpload(pendingFile);
+      setPendingFile(null);
     }
   };
 
@@ -371,7 +448,13 @@ const ScheduleAnalysis = ({ user }) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload(file);
+    if (!file) return;
+    const ext = file.name.toLowerCase();
+    if (ext.endsWith('.pdf') || ext.endsWith('.csv') || ext.endsWith('.xlsx') || ext.endsWith('.mpp') || ext.endsWith('.xml')) {
+      setPendingFile(file);
+    } else {
+      handleFileUpload(file);
+    }
   };
 
   const handleDragOver = (e) => {
@@ -383,50 +466,96 @@ const ScheduleAnalysis = ({ user }) => {
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
-    if (file) handleFileUpload(file);
+    if (file) {
+      const ext = file.name.toLowerCase();
+      if (ext.endsWith('.pdf') || ext.endsWith('.csv') || ext.endsWith('.xlsx') || ext.endsWith('.mpp') || ext.endsWith('.xml')) {
+        setPendingFile(file);
+      } else {
+        handleFileUpload(file);
+      }
+    }
     e.target.value = '';
   };
 
   const renderUploadZone = () => (
     <div className="flex-1 flex items-center justify-center p-8">
-      <div
-        className={`w-full max-w-lg border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 cursor-pointer ${
-          dragOver
-            ? 'border-[#1eb5ee] bg-[#1eb5ee]/5 scale-[1.02]'
-            : 'border-slate-300 hover:border-[#1eb5ee] hover:bg-[#1eb5ee]/5'
-        }`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.csv"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
-        <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#1eb5ee] to-[#00B4B4] flex items-center justify-center shadow-lg">
-          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
+      <div className="w-full max-w-lg space-y-4">
+        <div
+          className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 cursor-pointer ${
+            dragOver
+              ? 'border-[#1eb5ee] bg-[#1eb5ee]/5 scale-[1.02]'
+              : 'border-slate-300 hover:border-[#1eb5ee] hover:bg-[#1eb5ee]/5'
+          }`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.csv,.xlsx,.mpp,.xml"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#1eb5ee] to-[#00B4B4] flex items-center justify-center shadow-lg">
+            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-slate-800 mb-2">
+            {t('scheduleAnalysis.upload.title')}
+          </h3>
+          <p className="text-slate-500 mb-4">
+            {t('scheduleAnalysis.upload.subtitle')}
+          </p>
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1eb5ee] to-[#00B4B4] text-white font-medium text-sm shadow-md hover:shadow-lg transition-all">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            {t('scheduleAnalysis.upload.button')}
+          </div>
+          <p className="text-xs text-slate-400 mt-4">
+            {t('scheduleAnalysis.upload.hint')}
+          </p>
         </div>
-        <h3 className="text-xl font-bold text-slate-800 mb-2">
-          {t('scheduleAnalysis.upload.title')}
-        </h3>
-        <p className="text-slate-500 mb-4">
-          {t('scheduleAnalysis.upload.subtitle')}
-        </p>
-        <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1eb5ee] to-[#00B4B4] text-white font-medium text-sm shadow-md hover:shadow-lg transition-all">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          {t('scheduleAnalysis.upload.button')}
-        </div>
-        <p className="text-xs text-slate-400 mt-4">
-          {t('scheduleAnalysis.upload.hint')}
-        </p>
+
+        {pendingFile && (
+          <div
+            className="rounded-2xl border p-5 space-y-4"
+            style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderColor: 'rgba(0,180,180,0.25)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1eb5ee] to-[#00B4B4] flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-800 truncate">{pendingFile.name}</p>
+                <p className="text-xs text-slate-500">{(pendingFile.size / 1024).toFixed(1)} KB</p>
+              </div>
+              <button
+                onClick={() => { setPendingFile(null); setUseNusf(false); }}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <NusfToggle enabled={useNusf} onChange={setUseNusf} />
+
+            <button
+              onClick={handleStartAnalysis}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#1eb5ee] to-[#00B4B4] text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all"
+            >
+              {i18n.language?.startsWith('da') ? 'Start analyse' : 'Start Analysis'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

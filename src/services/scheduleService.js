@@ -105,6 +105,35 @@ export const scheduleService = {
     a.remove();
   },
 
+  async uploadAndAnalyzeV2(analysisId, file, language = 'en') {
+    const formData = new FormData();
+    formData.append('schedule', file);
+    formData.append('language', language);
+    formData.append('format', 'html');
+
+    const response = await uploadFilesWithAuth(
+      `${API_BASE}/api/schedule/analyses/${analysisId}/v2/upload`,
+      formData,
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `V2 upload failed with status ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async pollV2Progress(analysisId) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE}/api/schedule/analyses/${analysisId}/v2/progress`);
+      if (!response.ok) return { stage: 'unknown', message: '', step: 0, total_steps: 6 };
+      return response.json();
+    } catch {
+      return { stage: 'unknown', message: '', step: 0, total_steps: 6 };
+    }
+  },
+
   generateAnalysisId() {
     const hex = Array.from(crypto.getRandomValues(new Uint8Array(8)))
       .map(b => b.toString(16).padStart(2, '0')).join('');

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import ProgressModal from "./ProgressModal";
+import NusfToggle from "./NusfToggle";
 import { chatService } from "../services/chatService";
 import { getApiBaseUrl } from "../utils/apiConfig.js";
 import { handleApiError } from "../utils/errorHandler";
@@ -11,12 +12,18 @@ const ALLOWED_FILE_TYPES = [
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'application/vnd.ms-project',
+  'application/x-project',
   'text/plain',
   'text/csv',
-  'application/csv'
+  'application/csv',
+  'application/xml',
+  'text/xml'
 ];
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.txt', '.csv'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.txt', '.csv', '.xlsx', '.mpp', '.xml'];
 
 const MAX_CSV_ROWS = 3000;
 
@@ -75,7 +82,23 @@ const FileComparisonModal = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
   const [uploadProgressData, setUploadProgressData] = useState(null);
+  const [useNusf, setUseNusf] = useState(false);
   const cancelPollRef = React.useRef(null);
+
+  const isFilePdfOrCsv = (file) => {
+    if (!file) return false;
+    const name = file.name.toLowerCase();
+    return name.endsWith('.pdf') || name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.mpp') || name.endsWith('.xml');
+  };
+
+  const showNusfToggle = oldScheduleFile && newScheduleFile
+    && isFilePdfOrCsv(oldScheduleFile) && isFilePdfOrCsv(newScheduleFile);
+
+  useEffect(() => {
+    if (!showNusfToggle && useNusf) {
+      setUseNusf(false);
+    }
+  }, [showNusfToggle]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -89,6 +112,7 @@ const FileComparisonModal = ({
       setProgressMessage("");
       setUploadProgressData(null);
       setIsDragging({ old: false, new: false });
+      setUseNusf(false);
     }
   }, [isOpen]);
 
@@ -207,83 +231,118 @@ const FileComparisonModal = ({
     });
 
     try {
-      const result = await chatService.uploadFilesWithSession(oldScheduleFile, newScheduleFile, sessionId);
-
-      const finishUpload = async () => {
-        try {
-          const fd = new FormData();
-          fd.append('old_schedule', oldScheduleFile);
-          fd.append('new_schedule', newScheduleFile);
-          await uploadFilesWithAuth(`/api/chat/sessions/${sessionId}/files`, fd);
-        } catch (e) {
-          console.error('Backend file storage error:', e);
-        }
-        setUploadProgressData({ overall_progress: 100 });
-        setTimeout(() => {
-          setIsUploading(false);
-          setUploadProgressData(null);
-          if (onFilesUploaded) {
-            onFilesUploaded({
-              oldFileName: oldScheduleFile.name,
-              newFileName: newScheduleFile.name,
-              oldSessionId: result.oldSessionId,
-              newSessionId: result.newSessionId,
-            });
+      const finishUpload = (uploadResult) => new Promise((resolve) => {
+        const storeFiles = async () => {
+          try {
+            const fd = new FormData();
+            fd.append('old_schedule', oldScheduleFile);
+            fd.append('new_schedule', newScheduleFile);
+            await uploadFilesWithAuth(`/api/chat/sessions/${sessionId}/files`, fd);
+          } catch (e) {
+            console.error('Backend file storage error:', e);
           }
-        }, 600);
+          setUploadProgressData({ overall_progress: 100 });
+          setTimeout(() => {
+            setIsUploading(false);
+            setUploadProgressData(null);
+            if (onFilesUploaded) {
+              onFilesUploaded({
+                oldFileName: oldScheduleFile.name,
+                newFileName: newScheduleFile.name,
+                oldSessionId: uploadResult.oldSessionId,
+                newSessionId: uploadResult.newSessionId,
+              });
+            }
+            resolve();
+          }, 600);
+        };
+        storeFiles();
+      });
+
+      const updateProgressFromPoll = (data) => {
+        setUploadProgressData(prev => ({
+          ...prev,
+          overall_progress: data.overall_progress ?? prev?.overall_progress ?? 0,
+          old_filename:  data.old_filename  || prev?.old_filename,
+          new_filename:  data.new_filename  || prev?.new_filename,
+          old_schedule:  data.old_schedule  ?? prev?.old_schedule,
+          new_schedule:  data.new_schedule  ?? prev?.new_schedule,
+        }));
       };
 
-      if (result.isAsyncUpload) {
-        const proxyBase = getApiBaseUrl();
-        const pollInterval = setInterval(async () => {
-          try {
-            const res = await fetch(
-              `${proxyBase}/api/chat/proxy/upload/progress/${result.uploadId}`,
-              { credentials: 'include' }
-            );
-            if (!res.ok) {
-              console.warn('Poll response not ok:', res.status);
-              return;
-            }
-            const data = await res.json();
-            console.log('Poll data:', data);
+      if (useNusf && showNusfToggle) {
+        const v2Result = await chatService.uploadFilesV2(oldScheduleFile, newScheduleFile, sessionId);
 
-            setUploadProgressData(prev => ({
-              ...prev,
-              overall_progress: data.overall_progress ?? prev?.overall_progress ?? 0,
-              old_filename:  data.old_filename  || prev?.old_filename,
-              new_filename:  data.new_filename  || prev?.new_filename,
-              old_schedule:  data.old_schedule  ?? prev?.old_schedule,
-              new_schedule:  data.new_schedule  ?? prev?.new_schedule,
-            }));
-
-            if (data.status === 'complete') {
-              clearInterval(pollInterval);
-              cancelPollRef.current = null;
-              await finishUpload();
-            } else if (data.status === 'error' || data.status === 'failed') {
-              clearInterval(pollInterval);
-              cancelPollRef.current = null;
-              setError(data.message || t('fileComparison.uploadFailedRetry'));
-              setIsUploading(false);
-              setUploadProgressData(null);
-            }
-          } catch (err) {
-            console.warn('Poll error (will retry):', err.message);
-          }
-        }, 2000);
-
-        cancelPollRef.current = () => clearInterval(pollInterval);
+        const cancelPoll = chatService.pollV2UploadProgress(
+          v2Result.uploadId,
+          updateProgressFromPoll,
+          async () => {
+            cancelPollRef.current = null;
+            await finishUpload(v2Result);
+          },
+          (err) => {
+            cancelPollRef.current = null;
+            setError(err.message || t('fileComparison.uploadFailedRetry'));
+            setIsUploading(false);
+            setUploadProgressData(null);
+          },
+          null,
+        );
+        cancelPollRef.current = cancelPoll;
 
       } else {
-        await finishUpload();
+        const result = await chatService.uploadFilesWithSession(oldScheduleFile, newScheduleFile, sessionId);
+
+        if (result.isAsyncUpload) {
+          const proxyBase = getApiBaseUrl();
+          const pollInterval = setInterval(async () => {
+            try {
+              const res = await fetch(
+                `${proxyBase}/api/chat/proxy/upload/progress/${result.uploadId}`,
+                { credentials: 'include' }
+              );
+              if (!res.ok) {
+                console.warn('Poll response not ok:', res.status);
+                return;
+              }
+              const data = await res.json();
+              console.log('Poll data:', data);
+
+              updateProgressFromPoll(data);
+
+              if (data.status === 'complete') {
+                clearInterval(pollInterval);
+                cancelPollRef.current = null;
+                await finishUpload(result);
+              } else if (data.status === 'error' || data.status === 'failed') {
+                clearInterval(pollInterval);
+                cancelPollRef.current = null;
+                setError(data.message || t('fileComparison.uploadFailedRetry'));
+                setIsUploading(false);
+                setUploadProgressData(null);
+              }
+            } catch (err) {
+              console.warn('Poll error (will retry):', err.message);
+            }
+          }, 2000);
+
+          cancelPollRef.current = () => clearInterval(pollInterval);
+
+        } else {
+          await finishUpload(result);
+        }
       }
     } catch (error) {
       if (cancelPollRef.current) { cancelPollRef.current(); cancelPollRef.current = null; }
       console.error('Upload error:', error);
       const isDanish = i18n.language?.startsWith('da');
       let userErrorMessage = error.message || t('fileComparison.uploadFailedRetry');
-      if (userErrorMessage.includes('context length') || userErrorMessage.includes('token')) {
+      if (userErrorMessage.includes('NUSF_V2_UNAVAILABLE')) {
+        setUseNusf(false);
+        userErrorMessage = isDanish
+          ? 'NUSF v2-pipeline er endnu ikke tilgængelig. Skifte tilbage til standardprocessen — prøv igen.'
+          : 'The NUSF v2 pipeline is not yet available. Switched back to the standard pipeline — please try again.';
+      } else if (userErrorMessage.includes('context length') || userErrorMessage.includes('token')) {
         userErrorMessage = isDanish
           ? 'Filerne er for store til at behandle. Prøv venligst med mindre filer eller kontakt support.'
           : 'The uploaded files are too large to process. Please try with smaller files or contact support.';
@@ -508,7 +567,7 @@ const FileComparisonModal = ({
                       type="file"
                       onChange={(e) => handleFileChange(e, "old")}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      accept=".pdf,.doc,.docx,.txt,.csv"
+                      accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.mpp,.xml"
                       disabled={isUploading}
                     />
                     <div className="text-center flex-1 flex flex-col justify-center">
@@ -613,7 +672,7 @@ const FileComparisonModal = ({
                       type="file"
                       onChange={(e) => handleFileChange(e, "new")}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      accept=".pdf,.doc,.docx,.txt,.csv"
+                      accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.mpp,.xml"
                       disabled={isUploading}
                     />
                     <div className="text-center flex-1 flex flex-col justify-center">
@@ -734,33 +793,47 @@ const FileComparisonModal = ({
               )}
 
               {oldScheduleFile && newScheduleFile && !isUploading && (
-                <div
-                  className="p-4 rounded-xl border"
-                  style={{
-                    backgroundColor: "rgba(0, 214, 214, 0.1)",
-                    borderColor: "rgba(0, 214, 214, 0.3)",
-                    color: "#00a0a0",
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <svg
-                      className="w-5 h-5 flex-shrink-0"
-                      style={{ color: "#1eb5ee" }}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    <span className="font-medium">
-                      {t('fileComparison.bothFilesSelected')}
-                    </span>
+                <div className="space-y-3">
+                  <div
+                    className="p-4 rounded-xl border"
+                    style={{
+                      backgroundColor: "rgba(0, 214, 214, 0.1)",
+                      borderColor: "rgba(0, 214, 214, 0.3)",
+                      color: "#00a0a0",
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg
+                        className="w-5 h-5 flex-shrink-0"
+                        style={{ color: "#1eb5ee" }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      <span className="font-medium">
+                        {t('fileComparison.bothFilesSelected')}
+                      </span>
+                    </div>
                   </div>
+
+                  {showNusfToggle && (
+                    <div
+                      className="px-4 py-3 rounded-xl border"
+                      style={{
+                        backgroundColor: "rgba(255, 255, 255, 0.7)",
+                        borderColor: "rgba(0, 214, 214, 0.2)",
+                      }}
+                    >
+                      <NusfToggle enabled={useNusf} onChange={setUseNusf} />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
