@@ -76,6 +76,7 @@ if not JWT_SECRET:
     sys.exit(1)
 
 app.config['SECRET_KEY'] = JWT_SECRET
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB
 
 # Database configuration - prioritize DATABASE_URL for Replit
 DATABASE_URL = os.getenv('DATABASE_URL')
