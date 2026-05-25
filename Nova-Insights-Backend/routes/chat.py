@@ -901,6 +901,78 @@ def upload_session_files(session_id):
         conn.close()
 
 
+@chat_bp.route('/sessions/<session_id>/files/metadata', methods=['POST'])
+def save_session_file_metadata(session_id):
+    """Store only filenames and update session title — no binary upload required."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    data = request.get_json() or {}
+    old_filename = (data.get('old_filename') or '').strip()
+    new_filename = (data.get('new_filename') or '').strip()
+
+    if not old_filename and not new_filename:
+        return jsonify({'success': False, 'error': 'At least one filename required'}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT id FROM chat_sessions
+                WHERE session_id = %s AND user_id = %s
+            """, (session_id, user['user_id']))
+            session = cur.fetchone()
+            if not session:
+                return jsonify({'success': False, 'error': 'Session not found or access denied'}), 404
+
+            session_db_id = session['id']
+
+            for file_type, filename in [('old_schedule', old_filename), ('new_schedule', new_filename)]:
+                if not filename:
+                    continue
+                cur.execute("""
+                    SELECT id FROM chat_session_files WHERE session_id = %s AND file_type = %s
+                """, (session_db_id, file_type))
+                existing = cur.fetchone()
+                if existing:
+                    cur.execute("""
+                        UPDATE chat_session_files SET original_filename = %s, uploaded_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    """, (filename, existing['id']))
+                else:
+                    cur.execute("""
+                        INSERT INTO chat_session_files (session_id, file_type, original_filename)
+                        VALUES (%s, %s, %s)
+                    """, (session_db_id, file_type, filename))
+
+            new_title = None
+            if old_filename and new_filename:
+                new_title = f"📄 {old_filename} ↔ {new_filename}"
+                cur.execute("""
+                    UPDATE chat_sessions SET title = %s, last_activity_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (new_title, session_db_id))
+
+            conn.commit()
+
+            return jsonify({
+                'success': True,
+                'title': new_title,
+                'old_filename': old_filename,
+                'new_filename': new_filename,
+            })
+    except Exception as e:
+        print(f"Error saving file metadata: {e}")
+        conn.rollback()
+        return jsonify({'success': False, 'error': 'Failed to save file metadata'}), 500
+    finally:
+        conn.close()
+
+
 @chat_bp.route('/sessions/<session_id>/files/<file_type>', methods=['GET'])
 def download_session_file(session_id, file_type):
     """Download a file from a chat session with user/company isolation"""

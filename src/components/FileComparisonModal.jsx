@@ -6,7 +6,7 @@ import NusfToggle from "./NusfToggle";
 import { chatService } from "../services/chatService";
 import { getApiBaseUrl } from "../utils/apiConfig.js";
 import { handleApiError } from "../utils/errorHandler";
-import { uploadFilesWithAuth } from "../utils/authApi";
+import { postWithAuth } from "../utils/authApi";
 
 const ALLOWED_FILE_TYPES = [
   'application/pdf',
@@ -234,12 +234,12 @@ const FileComparisonModal = ({
       const finishUpload = (uploadResult) => new Promise((resolve) => {
         const storeFiles = async () => {
           try {
-            const fd = new FormData();
-            fd.append('old_schedule', oldScheduleFile);
-            fd.append('new_schedule', newScheduleFile);
-            await uploadFilesWithAuth(`/api/chat/sessions/${sessionId}/files`, fd);
+            await postWithAuth(`/api/chat/sessions/${sessionId}/files/metadata`, {
+              old_filename: oldScheduleFile.name,
+              new_filename: newScheduleFile.name,
+            });
           } catch (e) {
-            console.error('Backend file storage error:', e);
+            console.error('Backend file metadata error:', e);
           }
           setUploadProgressData({ overall_progress: 100 });
           setTimeout(() => {
