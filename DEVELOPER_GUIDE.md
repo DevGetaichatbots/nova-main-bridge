@@ -746,24 +746,32 @@ All user data is scoped by `company_id`:
 1. User creates new chat session
    └─▶ POST /api/chat/sessions → returns session_id
 
-2. User uploads two PDF files via FileComparisonModal
-   └─▶ POST /api/chat/proxy/upload → proxied to Azure RAG Agent
-       └─▶ Returns upload_id for progress polling
+2. User uploads two files via FileComparisonModal
+   └─▶ POST /api/chat/proxy/upload (or /proxy/v2/upload for NUSF)
+       └─▶ Proxied to Azure RAG Agent → returns upload_id for polling
+   Note: only the file bytes are sent here — no binary copy is stored
+         in the Flask DB at this stage.
 
 3. Frontend polls upload progress
    └─▶ GET /api/chat/proxy/upload/progress/:upload_id
-       └─▶ Steps: ocr → embedding → complete
+       └─▶ Steps: pipeline/ocr → storing → complete
 
-4. User sends comparison query (e.g., "Compare the schedules")
+4. On completion, frontend registers filenames (metadata only — no binary)
+   └─▶ POST /api/chat/sessions/:id/files/metadata
+       └─▶ Body: { old_filename, new_filename }
+       └─▶ Stores original_filename in chat_session_files
+       └─▶ Updates session title to "📄 file1 ↔ file2"
+
+5. User sends comparison query (e.g., "Compare the schedules")
    └─▶ POST /api/chat/proxy/query → proxied to Azure RAG Agent
        └─▶ Azure agent: fetch all chunks → GPT-4.1 → markdown → HTML
        └─▶ Returns structured HTML with tables, sections, stat cards
 
-5. Frontend stores bot response
+6. Frontend stores bot response
    └─▶ POST /api/chat/sessions/:id/messages
        └─▶ content_type: 'html', is_html: true
 
-6. ChatWidget.HtmlMessageContent parses the HTML:
+7. ChatWidget.HtmlMessageContent parses the HTML:
    └─▶ Extracts tables per .category-section
    └─▶ Renders interactive tables with Comments column
    └─▶ Renders summary/health sections below tables
@@ -984,7 +992,8 @@ Audit logs and chat histories can be exported as CSV via:
 | GET | `/sessions/:id/messages` | Get session messages | Yes |
 | POST | `/sessions/:id/messages` | Save new message | Yes |
 | PATCH | `/sessions/:id/messages/:msgId` | Update message | Yes |
-| POST | `/sessions/:id/files` | Store file metadata | Yes |
+| POST | `/sessions/:id/files/metadata` | Register filenames & update session title (no binary) | Yes |
+| POST | `/sessions/:id/files` | Store raw file binary in DB (dormant — retained for future re-download feature) | Yes |
 | GET | `/sessions/:id/files/:type` | Get file info | Yes |
 | GET | `/sessions/:id/annotations` | List annotations | Yes |
 | POST | `/sessions/:id/annotations` | Create annotation | Yes |
@@ -1060,6 +1069,7 @@ Browser → POST /api/chat/proxy/upload (Flask)
          → Compact CSV chunking
          → Store in Supabase pgvector
          ← upload_id for polling
+         Note: files go directly to RAG agent — no binary copy stored in Flask DB
 
 Step 2 — Progress Polling
 ─────────────────────────
@@ -1067,7 +1077,15 @@ Browser → GET /api/chat/proxy/upload/progress/:id (Flask)
          → GET /upload/progress/:id (Azure RAG Agent)
          ← { status, old_schedule.progress, new_schedule.progress }
 
-Step 3 — Comparison Query
+Step 3 — Metadata Registration (on upload complete)
+────────────────────────────────────────────────────
+Browser → POST /api/chat/sessions/:id/files/metadata (Flask)
+         → Body: { old_filename, new_filename }
+         → INSERT/UPDATE chat_session_files (original_filename only — no file_data)
+         → UPDATE chat_sessions SET title = "📄 old ↔ new"
+         ← { success, title, old_filename, new_filename }
+
+Step 4 — Comparison Query
 ─────────────────────────
 Browser → POST /api/chat/proxy/query (Flask)
          → POST /query (Azure RAG Agent)
@@ -1077,13 +1095,13 @@ Browser → POST /api/chat/proxy/query (Flask)
          → Markdown → HTML (html_formatter.py)
          ← Structured HTML response
 
-Step 4 — Message Persistence
+Step 5 — Message Persistence
 ────────────────────────────
 Browser → POST /api/chat/sessions/:id/messages (Flask)
          → INSERT into chat_messages (content_type='html', is_html=true)
          ← message_id
 
-Step 5 — Rendering
+Step 6 — Rendering
 ──────────────────
 ChatWidget.HtmlMessageContent:
   → Parse .comparison-results → extract .category-section tables
