@@ -968,6 +968,9 @@ def build_decision_engine_section(de_data, styles, language='da'):
     }
     status_label, status_color, status_bg = status_map.get(status, status_map['AT_RISK'])
 
+    analysis_mode = de_data.get('analysis_mode', 'confirmed_delay')
+    is_structural = analysis_mode == 'structural_change'
+
     top_title = 'Ledelsesoverblik' if language == 'da' else 'Executive Overview'
     issue_label = 'Største problem' if language == 'da' else 'Biggest Issue'
     impact_label = 'Konsekvens' if language == 'da' else 'Impact'
@@ -977,9 +980,14 @@ def build_decision_engine_section(de_data, styles, language='da'):
     blocking_label = 'Blokerer' if language == 'da' else 'What It Blocks'
     delay_label = 'Potentiel forsinkelse' if language == 'da' else 'Potential Delay'
     action_label = 'Din næste handling' if language == 'da' else 'Your Next Action'
-    impact_title = 'Estimeret Konsekvens' if language == 'da' else 'Estimated Impact'
-    time_label = 'Tid' if language == 'da' else 'Time'
-    cost_label = 'Omkostning' if language == 'da' else 'Cost'
+    if is_structural:
+        impact_title = 'Risikoeksponering' if language == 'da' else 'Risk Exposure'
+        time_label   = 'Risikoniveau' if language == 'da' else 'Risk Level'
+        cost_label   = 'Risikoeksponering' if language == 'da' else 'Risk Exposure'
+    else:
+        impact_title = 'Estimeret Konsekvens' if language == 'da' else 'Estimated Impact'
+        time_label   = 'Tid' if language == 'da' else 'Time'
+        cost_label   = 'Omkostning' if language == 'da' else 'Cost'
     phases_label = 'Faser' if language == 'da' else 'Phases'
     conf_title = 'Tillidsniveau' if language == 'da' else 'Confidence Level'
     basis_label = 'Grundlag' if language == 'da' else 'Basis'
@@ -1088,25 +1096,37 @@ def build_decision_engine_section(de_data, styles, language='da'):
         if_nothing_bottleneck = de_data.get('if_nothing_bottleneck', '')
         if_nothing_next_issue = de_data.get('if_nothing_next_issue', '')
         if if_nothing_delay or if_nothing_bottleneck or if_nothing_next_issue:
-            amber_pred = colors.Color(253/255, 230/255, 138/255)
-            amber_pred_bg = colors.Color(255/255, 251/255, 235/255)
-            amber_pred_text = colors.Color(120/255, 53/255, 15/255)
-            amber_pred_label = colors.Color(146/255, 64/255, 14/255)
-            if_nothing_title = 'Hvis intet ændres' if language == 'da' else 'If Nothing Changes'
-            if_nothing_delay_label = 'Estimeret forsinkelse' if language == 'da' else 'Estimated Delay'
-            if_nothing_bottleneck_label = 'Næste flaskehals' if language == 'da' else 'Next Bottleneck'
-            if_nothing_next_issue_label = 'Næste kritiske problem' if language == 'da' else 'Next Critical Issue'
+            if is_structural:
+                pred_border     = colors.Color(186/255, 230/255, 253/255)  # #bae6fd
+                pred_bg         = colors.Color(240/255, 249/255, 255/255)  # #f0f9ff
+                pred_text       = colors.Color(12/255,  74/255,  110/255)  # #0c4a6e
+                pred_label      = colors.Color(7/255,   89/255,  133/255)  # #075985
+                pred_hdr_color  = colors.Color(3/255,  105/255,  161/255)  # #0369a1
+                if_nothing_title            = 'Risikoscenarie — kræver validering' if language == 'da' else 'Risk Scenario — Requires Validation'
+                if_nothing_delay_label      = 'Risikoindikator' if language == 'da' else 'Risk Indicator'
+                if_nothing_bottleneck_label = 'Næste koordinationsrisiko' if language == 'da' else 'Next Coordination Risk'
+                if_nothing_next_issue_label = 'Tidligste risikofase' if language == 'da' else 'Earliest Risk Window'
+            else:
+                pred_border     = colors.Color(253/255, 230/255, 138/255)  # #fde68a
+                pred_bg         = colors.Color(255/255, 251/255, 235/255)  # #fffbeb
+                pred_text       = colors.Color(120/255,  53/255,  15/255)  # #78350f
+                pred_label      = colors.Color(146/255,  64/255,  14/255)  # #92400e
+                pred_hdr_color  = colors.Color(180/255,  83/255,   9/255)  # #b45309
+                if_nothing_title            = 'Hvis intet ændres' if language == 'da' else 'If Nothing Changes'
+                if_nothing_delay_label      = 'Estimeret forsinkelse' if language == 'da' else 'Estimated Delay'
+                if_nothing_bottleneck_label = 'Næste flaskehals' if language == 'da' else 'Next Bottleneck'
+                if_nothing_next_issue_label = 'Næste kritiske problem' if language == 'da' else 'Next Critical Issue'
 
             pred_header = Table([[Paragraph(
                 f'\u23e9  <b>{xml_escape(if_nothing_title)}</b>',
-                ParagraphStyle('predH', parent=styles['SummaryHeading'], textColor=amber_pred_label, fontSize=10)
+                ParagraphStyle('predH', parent=styles['SummaryHeading'], textColor=pred_hdr_color, fontSize=10)
             )]], colWidths=[515])
             pred_header.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, -1), amber_pred_bg),
+                ('BACKGROUND', (0, 0), (-1, -1), pred_bg),
                 ('LEFTPADDING', (0, 0), (-1, -1), 14),
                 ('TOPPADDING', (0, 0), (-1, -1), 7),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
-                ('LINEABOVE', (0, 0), (-1, 0), 1, amber_pred),
+                ('LINEABOVE', (0, 0), (-1, 0), 1, pred_border),
             ]))
             elements.append(pred_header)
 
@@ -1114,35 +1134,35 @@ def build_decision_engine_section(de_data, styles, language='da'):
             if if_nothing_delay:
                 pred_rows.append([
                     Paragraph(f'<b>{xml_escape(if_nothing_delay_label)}</b>',
-                              ParagraphStyle('predLbl', parent=styles['TableCell'], textColor=amber_pred_label, fontSize=8)),
+                              ParagraphStyle('predLbl', parent=styles['TableCell'], textColor=pred_label, fontSize=8)),
                     Paragraph(xml_escape(str(if_nothing_delay)),
-                              ParagraphStyle('predVal', parent=styles['SectionBodyText'], textColor=amber_pred_text, fontSize=8))
+                              ParagraphStyle('predVal', parent=styles['SectionBodyText'], textColor=pred_text, fontSize=8))
                 ])
             if if_nothing_bottleneck:
                 pred_rows.append([
                     Paragraph(f'<b>{xml_escape(if_nothing_bottleneck_label)}</b>',
-                              ParagraphStyle('predLbl2', parent=styles['TableCell'], textColor=amber_pred_label, fontSize=8)),
+                              ParagraphStyle('predLbl2', parent=styles['TableCell'], textColor=pred_label, fontSize=8)),
                     Paragraph(xml_escape(str(if_nothing_bottleneck)),
-                              ParagraphStyle('predVal2', parent=styles['SectionBodyText'], textColor=amber_pred_text, fontSize=8))
+                              ParagraphStyle('predVal2', parent=styles['SectionBodyText'], textColor=pred_text, fontSize=8))
                 ])
             if if_nothing_next_issue:
                 pred_rows.append([
                     Paragraph(f'<b>{xml_escape(if_nothing_next_issue_label)}</b>',
-                              ParagraphStyle('predLbl3', parent=styles['TableCell'], textColor=amber_pred_label, fontSize=8)),
+                              ParagraphStyle('predLbl3', parent=styles['TableCell'], textColor=pred_label, fontSize=8)),
                     Paragraph(xml_escape(str(if_nothing_next_issue)),
-                              ParagraphStyle('predVal3', parent=styles['SectionBodyText'], textColor=amber_pred_text, fontSize=8))
+                              ParagraphStyle('predVal3', parent=styles['SectionBodyText'], textColor=pred_text, fontSize=8))
                 ])
             if pred_rows:
                 pred_table = Table(pred_rows, colWidths=[130, 385])
                 pred_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, -1), amber_pred_bg),
+                    ('BACKGROUND', (0, 0), (-1, -1), pred_bg),
                     ('TOPPADDING', (0, 0), (-1, -1), 5),
                     ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
                     ('LEFTPADDING', (0, 0), (0, -1), 12),
                     ('LEFTPADDING', (1, 0), (1, -1), 10),
-                    ('LINEBELOW', (0, 0), (-1, -2), 0.5, amber_pred),
+                    ('LINEBELOW', (0, 0), (-1, -2), 0.5, pred_border),
                     ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                    ('LINEBELOW', (0, -1), (-1, -1), 1, amber_pred),
+                    ('LINEBELOW', (0, -1), (-1, -1), 1, pred_border),
                 ]))
                 elements.append(pred_table)
 
@@ -1500,13 +1520,20 @@ def parse_complex_html(html_content):
                     risk_label_map = {
                         'what it blocks': 'risk_blocking', 'blokerer': 'risk_blocking',
                         'potential delay': 'risk_delay', 'potentiel forsinkelse': 'risk_delay',
-                        # "If Nothing Changes" predictive fields
+                        # "If Nothing Changes" predictive fields (confirmed_delay mode)
                         'estimated delay': 'if_nothing_delay',
                         'estimeret forsinkelse': 'if_nothing_delay',
                         'next bottleneck': 'if_nothing_bottleneck',
                         'næste flaskehals': 'if_nothing_bottleneck',
                         'next critical issue': 'if_nothing_next_issue',
                         'næste kritiske problem': 'if_nothing_next_issue',
+                        # "Risk Scenario" predictive fields (structural_change mode)
+                        'risk indicator': 'if_nothing_delay',
+                        'risikoindikator': 'if_nothing_delay',
+                        'next coordination risk': 'if_nothing_bottleneck',
+                        'næste koordinationsrisiko': 'if_nothing_bottleneck',
+                        'earliest risk window': 'if_nothing_next_issue',
+                        'tidligste risikofase': 'if_nothing_next_issue',
                         # Next Action
                         'next action': 'risk_action', 'din næste handling': 'risk_action',
                         'your next action': 'risk_action', 'næste handling': 'risk_action',
@@ -1523,12 +1550,15 @@ def parse_complex_html(html_content):
                                 if val_div:
                                     de_data[key] = val_div.get_text(strip=True)
 
-                elif any(t in card_text_lower for t in ['estimated impact', 'estimeret konsekvens']):
+                elif any(t in card_text_lower for t in ['estimated impact', 'estimeret konsekvens', 'risk exposure', 'risikoeksponering']):
                     de_divs_to_remove.append(card)
                     impact_label_map = {
                         'time': 'impact_time', 'tid': 'impact_time',
                         'cost': 'impact_cost', 'omkostning': 'impact_cost',
                         'phases': 'impact_phases', 'faser': 'impact_phases',
+                        # structural_change mode labels
+                        'risk level': 'impact_time', 'risikoniveau': 'impact_time',
+                        'risk exposure': 'impact_cost', 'risikoeksponering': 'impact_cost',
                     }
                     for d in card.find_all('div'):
                         sty = d.get('style', '').replace(' ', '')
@@ -1637,7 +1667,7 @@ def parse_complex_html(html_content):
         _if_nothing_container = None
         for _d in soup.find_all('div'):
             _dt = _d.get_text(separator=' ', strip=True)
-            if re.search(r'if\s+nothing\s+changes|hvis\s+intet\s+[æa]ndres', _dt, re.I):
+            if re.search(r'if\s+nothing\s+changes|hvis\s+intet\s+[æa]ndres|risk\s+scenario|risikoscenarie', _dt, re.I):
                 # Pick the smallest div that still contains the heading (not giant wrappers)
                 if len(_dt) < 600:
                     _if_nothing_container = _d
@@ -1656,6 +1686,13 @@ def parse_complex_html(html_content):
                 'næste flaskehals': 'if_nothing_bottleneck',
                 'next critical issue': 'if_nothing_next_issue',
                 'næste kritiske problem': 'if_nothing_next_issue',
+                # structural_change mode labels
+                'risk indicator': 'if_nothing_delay',
+                'risikoindikator': 'if_nothing_delay',
+                'next coordination risk': 'if_nothing_bottleneck',
+                'næste koordinationsrisiko': 'if_nothing_bottleneck',
+                'earliest risk window': 'if_nothing_next_issue',
+                'tidligste risikofase': 'if_nothing_next_issue',
             }
 
             # Each data row is a <div> containing a <span> (label) + trailing text (value)
@@ -1680,9 +1717,9 @@ def parse_complex_html(html_content):
                 or result['decision_engine_data'].get('if_nothing_next_issue')):
 
             _if_nothing_label_re = {
-                'if_nothing_delay': r'(?:Estimated\s+Delay|Estimeret\s+forsinkelse)\s*:?\s*</span>\s*(.*?)(?:</div>|<span)',
-                'if_nothing_bottleneck': r'(?:Next\s+Bottleneck|N[æa]ste\s+flaskehals)\s*:?\s*</span>\s*(.*?)(?:</div>|<span)',
-                'if_nothing_next_issue': r'(?:Next\s+Critical\s+Issue|N[æa]ste\s+kritiske\s+problem)\s*:?\s*</span>\s*(.*?)(?:</div>|<span)',
+                'if_nothing_delay': r'(?:Estimated\s+Delay|Estimeret\s+forsinkelse|Risk\s+Indicator|Risikoindikator)\s*:?\s*</span>\s*(.*?)(?:</div>|<span)',
+                'if_nothing_bottleneck': r'(?:Next\s+Bottleneck|N[æa]ste\s+flaskehals|Next\s+Coordination\s+Risk|N[æa]ste\s+koordinationsrisiko)\s*:?\s*</span>\s*(.*?)(?:</div>|<span)',
+                'if_nothing_next_issue': r'(?:Next\s+Critical\s+Issue|N[æa]ste\s+kritiske\s+problem|Earliest\s+Risk\s+Window|Tidligste\s+risikofase)\s*:?\s*</span>\s*(.*?)(?:</div>|<span)',
             }
             for _field, _pat in _if_nothing_label_re.items():
                 _m = re.search(_pat, html_content, re.IGNORECASE | re.DOTALL)
