@@ -1552,6 +1552,8 @@ def parse_complex_html(html_content):
 
                 elif any(t in card_text_lower for t in ['estimated impact', 'estimeret konsekvens', 'risk exposure', 'risikoeksponering']):
                     de_divs_to_remove.append(card)
+                    if any(t in card_text_lower for t in ['risk exposure', 'risikoeksponering']):
+                        de_data['analysis_mode'] = 'structural_change'
                     impact_label_map = {
                         'time': 'impact_time', 'tid': 'impact_time',
                         'cost': 'impact_cost', 'omkostning': 'impact_cost',
@@ -1560,6 +1562,7 @@ def parse_complex_html(html_content):
                         'risk level': 'impact_time', 'risikoniveau': 'impact_time',
                         'risk exposure': 'impact_cost', 'risikoeksponering': 'impact_cost',
                     }
+                    structural_labels = {'risk level', 'risikoniveau', 'risk exposure', 'risikoeksponering'}
                     for d in card.find_all('div'):
                         sty = d.get('style', '').replace(' ', '')
                         if 'text-transform:uppercase' in sty:
@@ -1568,6 +1571,8 @@ def parse_complex_html(html_content):
                                 val_div = d.find_next_sibling('div')
                                 if val_div:
                                     de_data[impact_label_map[lbl]] = val_div.get_text(strip=True)
+                                if lbl in structural_labels:
+                                    de_data['analysis_mode'] = 'structural_change'
 
                 elif any(t in card_text_lower for t in ['confidence level', 'tillidsniveau']):
                     de_divs_to_remove.append(card)
