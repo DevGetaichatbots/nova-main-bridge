@@ -1,0 +1,379 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { chatService } from '../services/chatService';
+import { comparisonService } from '../services/comparisonService';
+import ChatWidget from './ChatWidget';
+import FileComparisonModal from './FileComparisonModal';
+import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
+
+const Spinner = () => (
+  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+  </svg>
+);
+
+const ComparisonAnalysis = ({ user }) => {
+  const { i18n } = useTranslation();
+  const [comparisons, setComparisons] = useState([]);
+  const [activeComparisonId, setActiveComparisonId] = useState(null);
+  const [activeComparison, setActiveComparison] = useState(null);
+  const [isLoadingList, setIsLoadingList] = useState(true);
+  const [isLoadingComparison, setIsLoadingComparison] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [error, setError] = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadSessionId, setUploadSessionId] = useState(null);
+  const [useClassic, setUseClassic] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const iframeRef = useRef(null);
+
+  const loadComparisons = useCallback(async () => {
+    try {
+      setIsLoadingList(true);
+      const data = await comparisonService.listComparisons();
+      if (data.success) setComparisons(data.comparisons || []);
+    } catch (err) {
+      console.error('Failed to load comparisons:', err);
+    } finally {
+      setIsLoadingList(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadComparisons();
+  }, [loadComparisons]);
+
+  useEffect(() => {
+    setUseClassic(false);
+    if (!activeComparisonId) {
+      setActiveComparison(null);
+      return;
+    }
+
+    const loadComparison = async () => {
+      try {
+        setIsLoadingComparison(true);
+        const data = await comparisonService.getComparison(activeComparisonId);
+        if (data.success) {
+          setActiveComparison(data.comparison);
+          if (data.comparison.session_id) setUploadSessionId(data.comparison.session_id);
+        }
+      } catch (err) {
+        console.error('Failed to load comparison:', err);
+        setError(err.message || 'Failed to load comparison');
+      } finally {
+        setIsLoadingComparison(false);
+      }
+    };
+
+    loadComparison();
+  }, [activeComparisonId]);
+
+  useEffect(() => {
+    if (!isProcessing) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, [isProcessing]);
+
+  const handleNewComparison = async () => {
+    if (isCreating) return;
+    setIsCreating(true);
+    setError(null);
+    try {
+      const comparisonId = comparisonService.generateComparisonId();
+      const now = new Date();
+      const title = `Comparison ${now.toLocaleDateString(i18n.language === 'da' ? 'da-DK' : 'en-US', {
+        day: '2-digit',
+        month: 'short',
+      })}, ${now.toLocaleTimeString(i18n.language === 'da' ? 'da-DK' : 'en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`;
+      const data = await comparisonService.createComparison(comparisonId, title);
+      if (data.success) {
+        const sessionId = chatService.generateSessionId();
+        setUploadSessionId(sessionId);
+        setActiveComparisonId(data.comparison.comparison_id);
+        setActiveComparison(data.comparison);
+        setShowUploadModal(true);
+        await loadComparisons();
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to create comparison');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleDeleteComparison = async (comparisonId) => {
+    try {
+      await comparisonService.deleteComparison(comparisonId);
+      if (activeComparisonId === comparisonId) {
+        setActiveComparisonId(null);
+        setActiveComparison(null);
+        setUploadSessionId(null);
+      }
+      await loadComparisons();
+    } catch (err) {
+      setError(err.message || 'Failed to delete comparison');
+    }
+  };
+
+  const handleRenameComparison = async (comparisonId, title) => {
+    try {
+      await comparisonService.renameComparison(comparisonId, title);
+      if (activeComparisonId === comparisonId) {
+        setActiveComparison(prev => prev ? { ...prev, title } : prev);
+      }
+      await loadComparisons();
+    } catch (err) {
+      setError(err.message || 'Failed to rename comparison');
+    }
+  };
+
+  const openUploadModal = () => {
+    if (!activeComparisonId) return;
+    const nextSessionId = uploadSessionId || chatService.generateSessionId();
+    setUploadSessionId(nextSessionId);
+    setShowUploadModal(true);
+  };
+
+  const handleFilesUploaded = async ({ oldSessionId, newSessionId, oldFileName, newFileName, useNusf }) => {
+    if (!activeComparisonId || !uploadSessionId) return;
+    setShowUploadModal(false);
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      await comparisonService.generateDashboard(activeComparisonId, {
+        sessionId: uploadSessionId,
+        oldSessionId,
+        newSessionId,
+        oldFilename: oldFileName,
+        newFilename: newFileName,
+        useNusf: useNusf,
+        language: i18n.language?.substring(0, 2) || 'en',
+      });
+
+      const data = await comparisonService.getComparison(activeComparisonId);
+      if (data.success) {
+        setActiveComparison(data.comparison);
+        await loadComparisons();
+      }
+    } catch (err) {
+      setError(err.message || 'Comparison failed');
+      setActiveComparison(prev => prev ? { ...prev, status: 'error' } : prev);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleIframeLoad = (event) => {
+    try {
+      const doc = event.target.contentDocument;
+      if (doc?.body) {
+        event.target.style.height = `${doc.body.scrollHeight + 32}px`;
+      }
+    } catch (_err) {
+      event.target.style.height = '100vh';
+    }
+  };
+
+  const renderDashboard = () => (
+    <iframe
+      ref={iframeRef}
+      srcDoc={activeComparison.dashboard_html}
+      sandbox="allow-scripts"
+      style={{ width: '100%', minHeight: '100vh', border: 'none', display: 'block' }}
+      onLoad={handleIframeLoad}
+      title="Project Health Dashboard"
+    />
+  );
+
+  const renderProcessing = () => (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="text-center max-w-sm">
+        <div className="relative w-20 h-20 mx-auto mb-6">
+          <div className="absolute inset-0 rounded-full border-2 border-[#1eb5ee]/20" />
+          <div className="absolute inset-0 rounded-full border-2 border-[#1eb5ee] border-t-transparent animate-spin" />
+          <div className="absolute inset-3 rounded-2xl bg-gradient-to-br from-[#1eb5ee] to-[#00B4B4] flex items-center justify-center text-white">
+            <Spinner />
+          </div>
+        </div>
+        <h3 className="text-lg font-bold text-slate-800 mb-2">Generating project health dashboard</h3>
+        <p className="text-sm text-slate-500 mb-5">
+          Nova is comparing the uploaded schedules and preparing the v5 graph view.
+        </p>
+        <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-[#1eb5ee] to-[#00B4B4] transition-all"
+            style={{ width: `${Math.min(85, Math.max(8, elapsedSeconds * 1.2))}%` }}
+          />
+        </div>
+        <p className="text-xs text-slate-400 mt-3">
+          {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')}
+        </p>
+      </div>
+    </div>
+  );
+
+  const renderWelcome = () => (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="text-center max-w-md">
+        <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#1eb5ee]/10 to-[#00B4B4]/10 flex items-center justify-center">
+          <svg className="w-10 h-10 text-[#00B4B4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-3">Project Health Dashboard</h2>
+        <p className="text-slate-500 mb-6">
+          Upload two schedules to generate the v5 graph dashboard automatically.
+        </p>
+        <button
+          onClick={handleNewComparison}
+          disabled={isCreating}
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#1eb5ee] to-[#00B4B4] text-white font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+        >
+          {isCreating ? <Spinner /> : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          )}
+          New Comparison
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderUpload = () => (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <button
+        onClick={openUploadModal}
+        className="w-full max-w-lg border-2 border-dashed border-slate-300 hover:border-[#1eb5ee] hover:bg-[#1eb5ee]/5 rounded-2xl p-12 text-center transition-all"
+      >
+        <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#1eb5ee] to-[#00B4B4] flex items-center justify-center shadow-lg">
+          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+        </div>
+        <h3 className="text-xl font-bold text-slate-800 mb-2">Upload old and new schedules</h3>
+        <p className="text-slate-500">The dashboard will be generated after both files finish processing.</p>
+      </button>
+    </div>
+  );
+
+  const renderReport = () => {
+    if (!activeComparison?.dashboard_html) return renderUpload();
+    const oldSessionId = activeComparison.old_session_id;
+    const newSessionId = activeComparison.new_session_id;
+
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-shrink-0 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">{activeComparison.title}</h3>
+            <p className="text-xs text-slate-500">
+              {[activeComparison.old_filename, activeComparison.new_filename].filter(Boolean).join(' vs ')}
+              {activeComparison.processing_time && ` - ${Number(activeComparison.processing_time).toFixed(1)}s`}
+            </p>
+          </div>
+          <button
+            onClick={() => setUseClassic(v => !v)}
+            className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all"
+          >
+            {useClassic ? 'Show Dashboard' : 'Use Classic Analysis'}
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto bg-slate-50">
+          {useClassic ? (
+            <ChatWidget
+              sessionId={activeComparison.session_id}
+              oldSessionId={oldSessionId}
+              newSessionId={newSessionId}
+              user={user}
+              tableSessionIds={{ oldSessionId, newSessionId }}
+              shouldAutoOpen={true}
+              isFullPage={true}
+            />
+          ) : (
+            renderDashboard()
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderMainContent = () => {
+    if (!activeComparisonId) return renderWelcome();
+    if (isLoadingComparison) {
+      return (
+        <div className="flex-1 flex items-center justify-center text-[#1eb5ee]">
+          <Spinner />
+        </div>
+      );
+    }
+    if (isProcessing) return renderProcessing();
+    if (activeComparison?.status === 'completed') return renderReport();
+    return renderUpload();
+  };
+
+  const sidebarItems = comparisons.map(comparison => ({
+    ...comparison,
+    analysis_id: comparison.comparison_id,
+    filename: [comparison.old_filename, comparison.new_filename].filter(Boolean).join(' vs '),
+  }));
+
+  return (
+    <div className="flex h-full bg-slate-50">
+      <ScheduleAnalysisSidebar
+        analyses={sidebarItems}
+        activeAnalysisId={activeComparisonId}
+        onSelectAnalysis={setActiveComparisonId}
+        onNewAnalysis={handleNewComparison}
+        onDeleteAnalysis={handleDeleteComparison}
+        onRenameAnalysis={handleRenameComparison}
+        isLoadingList={isLoadingList}
+        isCreating={isCreating}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+      />
+
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        {!sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="absolute top-4 left-4 z-20 p-2 rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all"
+          >
+            <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        )}
+
+        {error && (
+          <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">x</button>
+          </div>
+        )}
+
+        {renderMainContent()}
+      </div>
+
+      <FileComparisonModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onFilesUploaded={handleFilesUploaded}
+        sessionId={uploadSessionId}
+      />
+    </div>
+  );
+};
+
+export default ComparisonAnalysis;

@@ -14,7 +14,7 @@ def register_auth_routes(app):
     from routes.company import company_bp
     from routes.super_admin import super_admin_bp
     from routes.chat import chat_bp, init_chat_tables
-    from routes.schedule import schedule_bp, init_schedule_tables
+    from routes.schedule import schedule_bp, init_schedule_tables, init_comparison_tables
     from routes.audit import audit_bp
     from middleware.error_handler import register_error_handlers
     
@@ -27,6 +27,11 @@ def register_auth_routes(app):
         print("✅ Schedule analysis tables initialized successfully")
     else:
         print("⚠️ Could not initialize schedule analysis tables")
+    
+    if init_comparison_tables():
+        print("Schedule comparison tables initialized successfully")
+    else:
+        print("Could not initialize schedule comparison tables")
     
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(forgot_password_bp, url_prefix='/api')

@@ -246,6 +246,33 @@ const Navbar = ({ setUser: setAppUser }) => {
               </Link>
             )}
 
+            {user && (
+              <Link
+                to="/comparison"
+                onMouseEnter={() => import("./ComparisonAnalysis")}
+                className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
+                  isActive("/comparison")
+                    ? "text-[#1eb5ee]"
+                    : "text-gray-700 hover:text-[#1eb5ee]"
+                }`}
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 19V5m0 14h16M8 15l3-3 2 2 5-6"
+                  />
+                </svg>
+                {t('navbar.comparisonDashboard')}
+              </Link>
+            )}
+
             {/* Schedule Analysis Link - Only visible to logged in users */}
             {user && (
               <Link
@@ -631,6 +658,30 @@ const Navbar = ({ setUser: setAppUser }) => {
                   />
                 </svg>
                 {t('navbar.chat')}
+              </Link>
+            )}
+
+            {user && (
+              <Link
+                to="/comparison"
+                onClick={() => setIsMobileMenuOpen(false)}
+                onMouseEnter={() => import("./ComparisonAnalysis")}
+                className="flex items-center gap-2 px-6 py-3 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition-all duration-300"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 19V5m0 14h16M8 15l3-3 2 2 5-6"
+                  />
+                </svg>
+                {t('navbar.comparisonDashboard')}
               </Link>
             )}
 

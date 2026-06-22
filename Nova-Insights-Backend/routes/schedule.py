@@ -70,6 +70,48 @@ def init_schedule_tables():
         conn.close()
 
 
+def init_comparison_tables():
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS schedule_comparisons (
+                    id SERIAL PRIMARY KEY,
+                    comparison_id VARCHAR(60) UNIQUE NOT NULL,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                    title VARCHAR(255),
+                    old_filename VARCHAR(255),
+                    new_filename VARCHAR(255),
+                    session_id VARCHAR(255),
+                    old_session_id VARCHAR(255),
+                    new_session_id VARCHAR(255),
+                    status VARCHAR(20) DEFAULT 'pending',
+                    dashboard_html TEXT,
+                    use_nusf BOOLEAN DEFAULT FALSE,
+                    language VARCHAR(5) DEFAULT 'en',
+                    processing_time FLOAT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_comparisons_user_id
+                    ON schedule_comparisons(user_id);
+                CREATE INDEX IF NOT EXISTS idx_comparisons_comparison_id
+                    ON schedule_comparisons(comparison_id);
+            """)
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Error creating comparison tables: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
 def _invalidate_analyses_cache(user_id):
     cache_delete(f"schedule_analyses:user:{user_id}")
 
@@ -691,3 +733,304 @@ def v2_get_analysis_progress(analysis_id):
     except Exception as e:
         print(f"❌ [v2/NUSF] Progress poll error: {e}")
         return jsonify({'stage': 'unknown', 'message': 'Waiting...', 'step': 0, 'total_steps': 6}), 200
+
+
+@schedule_bp.route('/comparisons', methods=['GET'])
+def list_comparisons():
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT comparison_id, title, old_filename, new_filename, status,
+                       use_nusf, language, processing_time, created_at, updated_at
+                FROM schedule_comparisons
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT 50
+            """, (user['user_id'],))
+            comparisons = cur.fetchall()
+
+            for comparison in comparisons:
+                if comparison.get('created_at'):
+                    comparison['created_at'] = comparison['created_at'].isoformat()
+                if comparison.get('updated_at'):
+                    comparison['updated_at'] = comparison['updated_at'].isoformat()
+
+            return jsonify({'success': True, 'comparisons': comparisons})
+    except Exception as e:
+        print(f"Error listing comparisons: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@schedule_bp.route('/comparisons', methods=['POST'])
+def create_comparison():
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if user.get('role') == 'read_only_user':
+        return jsonify({'success': False, 'error': 'Read-only users cannot create comparisons'}), 403
+
+    data = request.get_json() or {}
+    comparison_id = data.get('comparison_id') or f"cmp_{secrets.token_hex(8)}"
+    title = data.get('title', 'New Comparison')
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT id, comparison_id FROM schedule_comparisons
+                WHERE comparison_id = %s AND user_id = %s
+            """, (comparison_id, user['user_id']))
+            existing = cur.fetchone()
+            if existing:
+                return jsonify({'success': True, 'comparison': existing})
+
+            cur.execute("""
+                INSERT INTO schedule_comparisons
+                    (comparison_id, user_id, company_id, title, status)
+                VALUES (%s, %s, %s, %s, 'pending')
+                RETURNING *
+            """, (comparison_id, user['user_id'], user.get('company_id'), title))
+            comparison = cur.fetchone()
+            conn.commit()
+
+            if comparison.get('created_at'):
+                comparison['created_at'] = comparison['created_at'].isoformat()
+            if comparison.get('updated_at'):
+                comparison['updated_at'] = comparison['updated_at'].isoformat()
+
+            return jsonify({'success': True, 'comparison': comparison}), 201
+    except Exception as e:
+        conn.rollback()
+        print(f"Error creating comparison: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@schedule_bp.route('/comparisons/<comparison_id>', methods=['GET'])
+def get_comparison(comparison_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT *
+                FROM schedule_comparisons
+                WHERE comparison_id = %s AND user_id = %s
+            """, (comparison_id, user['user_id']))
+            comparison = cur.fetchone()
+
+            if not comparison:
+                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+
+            if comparison.get('created_at'):
+                comparison['created_at'] = comparison['created_at'].isoformat()
+            if comparison.get('updated_at'):
+                comparison['updated_at'] = comparison['updated_at'].isoformat()
+
+            return jsonify({'success': True, 'comparison': comparison})
+    except Exception as e:
+        print(f"Error getting comparison: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@schedule_bp.route('/comparisons/<comparison_id>', methods=['PATCH'])
+def rename_comparison(comparison_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if user.get('role') == 'read_only_user':
+        return jsonify({'success': False, 'error': 'Read-only users cannot rename comparisons'}), 403
+
+    data = request.get_json() or {}
+    title = data.get('title', '').strip()
+    if not title:
+        return jsonify({'success': False, 'error': 'Title is required'}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                UPDATE schedule_comparisons
+                SET title = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE comparison_id = %s AND user_id = %s
+                RETURNING id, comparison_id, title
+            """, (title, comparison_id, user['user_id']))
+            comparison = cur.fetchone()
+            conn.commit()
+
+            if not comparison:
+                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+
+            return jsonify({'success': True, 'comparison': comparison})
+    except Exception as e:
+        conn.rollback()
+        print(f"Error renaming comparison: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@schedule_bp.route('/comparisons/<comparison_id>', methods=['DELETE'])
+def delete_comparison(comparison_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if user.get('role') == 'read_only_user':
+        return jsonify({'success': False, 'error': 'Read-only users cannot delete comparisons'}), 403
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM schedule_comparisons
+                WHERE comparison_id = %s AND user_id = %s
+                RETURNING id
+            """, (comparison_id, user['user_id']))
+            deleted = cur.fetchone()
+            conn.commit()
+
+            if not deleted:
+                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+
+            return jsonify({'success': True, 'message': 'Comparison deleted'})
+    except Exception as e:
+        conn.rollback()
+        print(f"Error deleting comparison: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@schedule_bp.route('/comparisons/<comparison_id>/generate', methods=['POST'])
+def generate_comparison(comparison_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if user.get('role') == 'read_only_user':
+        return jsonify({'success': False, 'error': 'Read-only users cannot generate comparisons'}), 403
+
+    data = request.get_json() or {}
+    session_id = data.get('session_id', '')
+    old_session_id = data.get('old_session_id', '')
+    new_session_id = data.get('new_session_id', '')
+    old_filename = data.get('old_filename', 'Old Schedule')
+    new_filename = data.get('new_filename', 'New Schedule')
+    language = data.get('language', 'en')
+    use_nusf = data.get('use_nusf', False)
+
+    import time as _time
+    start = _time.time()
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE schedule_comparisons
+                SET session_id=%s, old_session_id=%s, new_session_id=%s,
+                    old_filename=%s, new_filename=%s, language=%s,
+                    use_nusf=%s, status='processing', updated_at=CURRENT_TIMESTAMP
+                WHERE comparison_id=%s AND user_id=%s
+            """, (session_id, old_session_id, new_session_id,
+                  old_filename, new_filename, language,
+                  use_nusf, comparison_id, user['user_id']))
+            if cur.rowcount == 0:
+                conn.commit()
+                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+            conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"Error marking comparison processing: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+    try:
+        agent_resp = http_requests.post(
+            f"{AGENT_BASE_URL}/v5-graph/compare",
+            data={
+                'session_id': session_id,
+                'old_session_id': old_session_id,
+                'new_session_id': new_session_id,
+                'language': language,
+                'format': 'html',
+                'analysis_id': comparison_id,
+            },
+            timeout=300,
+            verify=False,
+        )
+        agent_resp.raise_for_status()
+        payload = agent_resp.json()
+        dashboard_html = payload.get('response', '')
+        elapsed = _time.time() - start
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'error': 'Database error after processing'}), 500
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE schedule_comparisons
+                    SET dashboard_html=%s, status='completed',
+                        processing_time=%s, updated_at=CURRENT_TIMESTAMP
+                    WHERE comparison_id=%s AND user_id=%s
+                """, (dashboard_html, elapsed, comparison_id, user['user_id']))
+                conn.commit()
+        finally:
+            conn.close()
+
+        return jsonify({
+            'success': True,
+            'comparison_id': comparison_id,
+            'processing_time': elapsed,
+        })
+
+    except Exception as e:
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE schedule_comparisons
+                        SET status='error', updated_at=CURRENT_TIMESTAMP
+                        WHERE comparison_id=%s AND user_id=%s
+                    """, (comparison_id, user['user_id']))
+                    conn.commit()
+            finally:
+                conn.close()
+        return jsonify({'success': False, 'error': str(e)}), 500

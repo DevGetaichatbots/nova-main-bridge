@@ -19,6 +19,7 @@ import Login from "./components/Login";
 const ChatWidget = lazy(() => import("./components/ChatWidget"));
 const FileComparisonModal = lazy(() => import("./components/FileComparisonModal"));
 const ScheduleAnalysis = lazy(() => import("./components/ScheduleAnalysis"));
+const ComparisonAnalysis = lazy(() => import("./components/ComparisonAnalysis"));
 const AdminPortal = lazy(() => import("./components/AdminPortal"));
 const CompanyPortal = lazy(() => import("./components/CompanyPortal"));
 const SuperAdminPortal = lazy(() => import("./components/SuperAdminPortal"));
@@ -42,6 +43,7 @@ const NotFound = lazy(() => import("./components/NotFound"));
 const preloadCriticalRoutes = () => {
   import("./components/ChatWidget");
   import("./components/ScheduleAnalysis");
+  import("./components/ComparisonAnalysis");
 };
 
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -2350,6 +2352,19 @@ function App() {
                   <Navbar user={user} setUser={setUser} />
                   <div className="flex-1 overflow-hidden pt-14">
                     <ScheduleAnalysis user={user} />
+                  </div>
+                </div>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comparison"
+            element={
+              <ProtectedRoute>
+                <div className="h-screen flex flex-col overflow-hidden">
+                  <Navbar user={user} setUser={setUser} />
+                  <div className="flex-1 overflow-hidden pt-14">
+                    <ComparisonAnalysis user={user} />
                   </div>
                 </div>
               </ProtectedRoute>

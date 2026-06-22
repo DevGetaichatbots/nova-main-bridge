@@ -14,7 +14,8 @@
     "confirm": "Yes, log out",
     "companyPortal": "Company Portal",
     "superAdmin": "Super Admin",
-    "scheduleAnalysis": "Schedule Risk"
+    "scheduleAnalysis": "Schedule Risk",
+    "comparisonDashboard": "Health Dashboard"
   },
   "footer": {
     "poweredBy": "Powered by",

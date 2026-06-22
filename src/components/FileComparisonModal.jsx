@@ -251,6 +251,7 @@ const FileComparisonModal = ({
                 newFileName: newScheduleFile.name,
                 oldSessionId: uploadResult.oldSessionId,
                 newSessionId: uploadResult.newSessionId,
+                useNusf,
               });
             }
             resolve();

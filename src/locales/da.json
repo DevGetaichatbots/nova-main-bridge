@@ -14,7 +14,8 @@
     "confirm": "Ja, log ud",
     "companyPortal": "Virksomhedsportal",
     "superAdmin": "Super Admin",
-    "scheduleAnalysis": "Schedule Risk"
+    "scheduleAnalysis": "Schedule Risk",
+    "comparisonDashboard": "Health Dashboard"
   },
   "footer": {
     "poweredBy": "Drevet af",
