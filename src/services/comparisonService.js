@@ -36,6 +36,29 @@ export const comparisonService = {
     return parseJson(response, 'Failed to fetch comparison');
   },
 
+  async downloadPdf(comparisonId, language = 'en') {
+    const response = await fetchWithAuth(`${API_BASE}/${comparisonId}/pdf?language=${language}`);
+    if (!response.ok) throw new Error('Failed to download PDF');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = 'Nova_Insight_Dashboard.pdf';
+    if (disposition) {
+      const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match && match[1]) filename = match[1].replace(/['"]/g, '');
+    }
+
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    a.remove();
+  },
+
   async renameComparison(comparisonId, title) {
     const response = await patchWithAuth(`/api/schedule/comparisons/${comparisonId}`, { title });
     return parseJson(response, 'Failed to rename comparison');

@@ -28,6 +28,7 @@ const ComparisonAnalysis = ({ user }) => {
   const [uploadSessionId, setUploadSessionId] = useState(null);
   const [useClassic, setUseClassic] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const iframeRef = useRef(null);
 
   const loadComparisons = useCallback(async () => {
@@ -185,6 +186,21 @@ const ComparisonAnalysis = ({ user }) => {
     }
   };
 
+  const handleDownloadPdf = async () => {
+    if (!activeComparisonId || isDownloadingPdf) return;
+    setIsDownloadingPdf(true);
+    setError(null);
+    try {
+      const lang = i18n.language?.substring(0, 2) || 'en';
+      await comparisonService.downloadPdf(activeComparisonId, lang);
+    } catch (err) {
+      console.error('Dashboard PDF download error:', err);
+      setError('Failed to download dashboard PDF. Please try again.');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   const renderDashboard = () => (
     <iframe
       ref={iframeRef}
@@ -283,12 +299,28 @@ const ComparisonAnalysis = ({ user }) => {
               {activeComparison.processing_time && ` - ${Number(activeComparison.processing_time).toFixed(1)}s`}
             </p>
           </div>
-          <button
-            onClick={() => setUseClassic(v => !v)}
-            className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all"
-          >
-            {useClassic ? 'Show Dashboard' : 'Use Classic Analysis'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all disabled:opacity-50"
+            >
+              {isDownloadingPdf ? (
+                <Spinner />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )}
+              Download PDF
+            </button>
+            <button
+              onClick={() => setUseClassic(v => !v)}
+              className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all"
+            >
+              {useClassic ? 'Show Dashboard' : 'Use Classic Analysis'}
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto bg-slate-50">
           {useClassic ? (
