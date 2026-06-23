@@ -2820,84 +2820,41 @@ def _dashboard_tables(soup, styles, max_tables=6, max_rows=14):
     return rendered
 
 
+_DASHBOARD_PRINT_CSS = """
+<style>
+@page { size: A4; margin: 10mm 12mm; }
+* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+.v5-sidebar { display: none !important; }
+.v5-page-body { display: block !important; }
+.v5-main { padding: 0 !important; }
+.v5-scroll-wrap { max-height: none !important; overflow: visible !important; }
+</style>
+"""
+
+
 def generate_dashboard_pdf(comparison, user_info=None, language='en'):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=40,
-        leftMargin=40,
-        topMargin=50,
-        bottomMargin=55
-    )
+    from weasyprint import HTML
 
-    styles = get_styles()
-    story = []
-    is_da = language == 'da'
-    title = 'Projekt Health Dashboard' if is_da else 'Project Health Dashboard'
-    subtitle = 'Tidsplan Sammenligning' if is_da else 'Schedule Comparison'
-
-    meta_labels = {
-        'old': 'Gammel tidsplan' if is_da else 'Old Schedule',
-        'new': 'Ny tidsplan' if is_da else 'New Schedule',
-        'analyzed': 'Analyseret' if is_da else 'Analyzed',
-        'processing': 'Behandlingstid' if is_da else 'Processing Time',
-        'user': 'Bruger' if is_da else 'User',
-        'generated': 'Genereret' if is_da else 'Generated',
-    }
-
-    meta_items = []
-    if comparison.get('old_filename'):
-        meta_items.append((meta_labels['old'], comparison['old_filename']))
-    if comparison.get('new_filename'):
-        meta_items.append((meta_labels['new'], comparison['new_filename']))
-    if comparison.get('created_at'):
-        try:
-            created_at = comparison['created_at']
-            if isinstance(created_at, str):
-                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-            meta_items.append((meta_labels['analyzed'], created_at.strftime('%d-%m-%Y %H:%M')))
-        except Exception:
-            meta_items.append((meta_labels['analyzed'], str(comparison['created_at'])))
-    if comparison.get('processing_time'):
-        meta_items.append((meta_labels['processing'], f"{float(comparison['processing_time']):.1f}s"))
-    if user_info:
-        user_name = user_info.get('name') or user_info.get('email', '')
-        if user_name:
-            meta_items.append((meta_labels['user'], user_name))
-    meta_items.append((meta_labels['generated'], datetime.now().strftime('%d-%m-%Y %H:%M')))
-
-    build_cover_page(story, styles, title, subtitle, meta_items, language)
-    story.append(PageBreak())
-
-    html_content = comparison.get('dashboard_html', '')
-    if not html_content:
-        story.append(Paragraph("No dashboard content available.", styles['BotMessage']))
-        doc.build(story, onFirstPage=add_cover_page_decoration, onLaterPages=add_page_number_and_footer)
+    dashboard_html = comparison.get('dashboard_html', '')
+    if not dashboard_html:
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=50, bottomMargin=55)
+        styles = get_styles()
+        doc.build(
+            [Paragraph("No dashboard content available.", styles['BotMessage'])],
+            onFirstPage=add_page_number_and_footer,
+            onLaterPages=add_page_number_and_footer,
+        )
         buffer.seek(0)
         return buffer
 
-    soup = BeautifulSoup(html_content, 'html.parser')
+    if '</head>' in dashboard_html:
+        html_for_pdf = dashboard_html.replace('</head>', f'{_DASHBOARD_PRINT_CSS}</head>', 1)
+    else:
+        html_for_pdf = _DASHBOARD_PRINT_CSS + dashboard_html
 
-    heading = _clean_dashboard_text((soup.find(['h1', 'h2']) or soup).get_text(' ', strip=True))
-    if heading:
-        _dashboard_section_header(story, comparison.get('title') or heading[:90], styles, CYAN_DARK)
-
-    text_items = _dashboard_text_items(soup)
-    if text_items:
-        summary_label = 'Dashboard resume' if is_da else 'Dashboard Summary'
-        _dashboard_section_header(story, summary_label, styles, TEAL_PRIMARY)
-        for item in text_items:
-            story.append(Paragraph(f'- {xml_escape(item)}', styles['SectionBodyText']))
-        story.append(Spacer(1, 10))
-
-    table_elements = _dashboard_tables(soup, styles)
-    if table_elements:
-        tables_label = 'Dashboard tabeller' if is_da else 'Dashboard Tables'
-        _dashboard_section_header(story, tables_label, styles, DARK_HEADER)
-        story.extend(table_elements)
-
-    doc.build(story, onFirstPage=add_cover_page_decoration, onLaterPages=add_page_number_and_footer)
+    buffer = BytesIO()
+    HTML(string=html_for_pdf).write_pdf(buffer)
     buffer.seek(0)
     return buffer
 
