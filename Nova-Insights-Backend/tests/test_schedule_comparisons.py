@@ -75,6 +75,7 @@ def _install_import_stubs():
     sys.modules["utils.redis_client"].cache_set = lambda *_args, **_kwargs: None
     sys.modules["utils.redis_client"].cache_delete = lambda *_args, **_kwargs: None
     sys.modules["utils.pdf_generator"].generate_schedule_analysis_pdf = lambda *_args, **_kwargs: None
+    sys.modules["utils.pdf_generator"].generate_dashboard_pdf = lambda *_args, **_kwargs: None
     sys.modules["utils.pdf_generator"].sanitize_filename = lambda value: value
 
 
@@ -198,6 +199,37 @@ class ScheduleComparisonTests(unittest.TestCase):
         self.assertEqual(result["error"], "Comparison not found")
         post.assert_not_called()
         self.assertTrue(conn.committed)
+        self.assertTrue(conn.closed)
+
+    def test_download_comparison_pdf_uses_dashboard_html(self):
+        schedule.request.args = {"language": "en"}
+        comparison = {
+            "comparison_id": "cmp_123",
+            "title": "Dashboard Export",
+            "old_filename": "old.csv",
+            "new_filename": "new.csv",
+            "status": "completed",
+            "dashboard_html": "<html><body><h1>Dashboard</h1></body></html>",
+            "language": "en",
+            "processing_time": 12.5,
+            "created_at": "2026-06-23T09:30:00",
+        }
+        conn = _Connection(rows=[comparison])
+        pdf_buffer = object()
+
+        with patch.object(schedule, "get_current_user", return_value={"user_id": 7, "name": "User", "email": "u@example.com"}), \
+             patch.object(schedule, "get_db_connection", return_value=conn), \
+             patch.object(schedule, "generate_dashboard_pdf", return_value=pdf_buffer) as generate_pdf:
+            result = schedule.download_comparison_pdf("cmp_123")
+
+        self.assertEqual(result[0], "send_file")
+        self.assertIs(result[1][0], pdf_buffer)
+        self.assertEqual(result[2]["mimetype"], "application/pdf")
+        self.assertEqual(result[2]["download_name"], "Nova_Insight_Dashboard Export.pdf")
+        generate_pdf.assert_called_once_with(comparison, {"name": "User", "email": "u@example.com"}, "en")
+        query, params = conn.cursor_obj.executed[0]
+        self.assertIn("dashboard_html", query)
+        self.assertEqual(params, ("cmp_123", 7))
         self.assertTrue(conn.closed)
 
 

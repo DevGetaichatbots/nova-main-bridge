@@ -2735,6 +2735,173 @@ def sanitize_filename(text, max_length=50):
     return safe[:max_length] if safe else 'export'
 
 
+def _clean_dashboard_text(value):
+    if not value:
+        return ''
+    cleaned = re.sub(r'\s+', ' ', str(value)).strip()
+    if not cleaned:
+        return ''
+    if re.search(r'[{};]', cleaned) and ':' in cleaned:
+        return ''
+    return cleaned
+
+
+def _dashboard_section_header(story, title, styles, color=TEAL_PRIMARY):
+    header = Table(
+        [[Paragraph(f'<b>{xml_escape(title)}</b>', styles['TableHeaderCell'])]],
+        colWidths=[515]
+    )
+    header.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), color),
+        ('TOPPADDING', (0, 0), (-1, -1), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+    ]))
+    story.append(header)
+    story.append(Spacer(1, 8))
+
+
+def _dashboard_text_items(soup, limit=45):
+    for tag_name in ['script', 'style', 'svg', 'canvas', 'noscript']:
+        for tag in soup.find_all(tag_name):
+            tag.decompose()
+
+    items = []
+    seen = set()
+    for text_node in soup.stripped_strings:
+        text = _clean_dashboard_text(text_node)
+        if not text or len(text) < 2:
+            continue
+        lowered = text.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        items.append(text)
+        if len(items) >= limit:
+            break
+    return items
+
+
+def _dashboard_tables(soup, styles, max_tables=6, max_rows=14):
+    rendered = []
+    for table in soup.find_all('table')[:max_tables]:
+        rows = []
+        for tr in table.find_all('tr')[:max_rows]:
+            cells = tr.find_all(['th', 'td'])
+            row = [_clean_dashboard_text(cell.get_text(' ', strip=True)) for cell in cells]
+            row = [cell for cell in row if cell]
+            if row:
+                rows.append(row)
+        if not rows:
+            continue
+
+        column_count = max(len(row) for row in rows)
+        normalized = [row + [''] * (column_count - len(row)) for row in rows]
+        col_widths = [515 / column_count] * column_count
+        table_rows = []
+        for row_index, row in enumerate(normalized):
+            style = styles['TableHeaderCell'] if row_index == 0 else styles['TableCell']
+            table_rows.append([Paragraph(xml_escape(cell or '-'), style) for cell in row])
+
+        pdf_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
+        pdf_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), DARK_HEADER),
+            ('GRID', (0, 0), (-1, -1), 0.5, BORDER_GRAY),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [WHITE, LIGHT_GRAY]),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        rendered.append(pdf_table)
+        rendered.append(Spacer(1, 10))
+    return rendered
+
+
+def generate_dashboard_pdf(comparison, user_info=None, language='en'):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=50,
+        bottomMargin=55
+    )
+
+    styles = get_styles()
+    story = []
+    is_da = language == 'da'
+    title = 'Projekt Health Dashboard' if is_da else 'Project Health Dashboard'
+    subtitle = 'Tidsplan Sammenligning' if is_da else 'Schedule Comparison'
+
+    meta_labels = {
+        'old': 'Gammel tidsplan' if is_da else 'Old Schedule',
+        'new': 'Ny tidsplan' if is_da else 'New Schedule',
+        'analyzed': 'Analyseret' if is_da else 'Analyzed',
+        'processing': 'Behandlingstid' if is_da else 'Processing Time',
+        'user': 'Bruger' if is_da else 'User',
+        'generated': 'Genereret' if is_da else 'Generated',
+    }
+
+    meta_items = []
+    if comparison.get('old_filename'):
+        meta_items.append((meta_labels['old'], comparison['old_filename']))
+    if comparison.get('new_filename'):
+        meta_items.append((meta_labels['new'], comparison['new_filename']))
+    if comparison.get('created_at'):
+        try:
+            created_at = comparison['created_at']
+            if isinstance(created_at, str):
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            meta_items.append((meta_labels['analyzed'], created_at.strftime('%d-%m-%Y %H:%M')))
+        except Exception:
+            meta_items.append((meta_labels['analyzed'], str(comparison['created_at'])))
+    if comparison.get('processing_time'):
+        meta_items.append((meta_labels['processing'], f"{float(comparison['processing_time']):.1f}s"))
+    if user_info:
+        user_name = user_info.get('name') or user_info.get('email', '')
+        if user_name:
+            meta_items.append((meta_labels['user'], user_name))
+    meta_items.append((meta_labels['generated'], datetime.now().strftime('%d-%m-%Y %H:%M')))
+
+    build_cover_page(story, styles, title, subtitle, meta_items, language)
+    story.append(PageBreak())
+
+    html_content = comparison.get('dashboard_html', '')
+    if not html_content:
+        story.append(Paragraph("No dashboard content available.", styles['BotMessage']))
+        doc.build(story, onFirstPage=add_cover_page_decoration, onLaterPages=add_page_number_and_footer)
+        buffer.seek(0)
+        return buffer
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    heading = _clean_dashboard_text((soup.find(['h1', 'h2']) or soup).get_text(' ', strip=True))
+    if heading:
+        _dashboard_section_header(story, comparison.get('title') or heading[:90], styles, CYAN_DARK)
+
+    text_items = _dashboard_text_items(soup)
+    if text_items:
+        summary_label = 'Dashboard resume' if is_da else 'Dashboard Summary'
+        _dashboard_section_header(story, summary_label, styles, TEAL_PRIMARY)
+        for item in text_items:
+            story.append(Paragraph(f'- {xml_escape(item)}', styles['SectionBodyText']))
+        story.append(Spacer(1, 10))
+
+    table_elements = _dashboard_tables(soup, styles)
+    if table_elements:
+        tables_label = 'Dashboard tabeller' if is_da else 'Dashboard Tables'
+        _dashboard_section_header(story, tables_label, styles, DARK_HEADER)
+        story.extend(table_elements)
+
+    doc.build(story, onFirstPage=add_cover_page_decoration, onLaterPages=add_page_number_and_footer)
+    buffer.seek(0)
+    return buffer
+
+
 def generate_message_pdf(message, session_info, user_info, language='da', query_text=None):
     buffer = BytesIO()
     doc = SimpleDocTemplate(

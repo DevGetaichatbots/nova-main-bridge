@@ -3,7 +3,7 @@ from utils.database import get_db_connection
 from utils.token_manager import decode_token
 from utils.audit_logger import log_audit_event
 from utils.redis_client import cache_get, cache_set, cache_delete
-from utils.pdf_generator import generate_schedule_analysis_pdf, sanitize_filename
+from utils.pdf_generator import generate_schedule_analysis_pdf, generate_dashboard_pdf, sanitize_filename
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import secrets
@@ -851,6 +851,57 @@ def get_comparison(comparison_id):
             return jsonify({'success': True, 'comparison': comparison})
     except Exception as e:
         print(f"Error getting comparison: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@schedule_bp.route('/comparisons/<comparison_id>/pdf', methods=['GET'])
+def download_comparison_pdf(comparison_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT comparison_id, title, old_filename, new_filename, status,
+                       dashboard_html, language, processing_time, created_at
+                FROM schedule_comparisons
+                WHERE comparison_id = %s AND user_id = %s
+            """, (comparison_id, user['user_id']))
+            comparison = cur.fetchone()
+
+            if not comparison:
+                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+
+            if comparison.get('status') != 'completed' or not comparison.get('dashboard_html'):
+                return jsonify({'success': False, 'error': 'Comparison dashboard not yet completed'}), 400
+
+            if comparison.get('created_at') and hasattr(comparison['created_at'], 'isoformat'):
+                comparison['created_at'] = comparison['created_at'].isoformat()
+
+            language = request.args.get('language', comparison.get('language', 'en'))
+            user_info = {'name': user.get('name', ''), 'email': user.get('email', '')}
+            pdf_buffer = generate_dashboard_pdf(comparison, user_info, language)
+
+            safe_name = sanitize_filename(comparison.get('title', 'dashboard_comparison'))
+            filename_out = f"Nova_Insight_{safe_name}.pdf"
+
+            return send_file(
+                pdf_buffer,
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name=filename_out
+            )
+    except Exception as e:
+        print(f"Error generating comparison dashboard PDF: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         conn.close()
