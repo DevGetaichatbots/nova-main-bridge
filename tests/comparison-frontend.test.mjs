@@ -51,4 +51,9 @@ assert.match(shell, /overflow-hidden/, "AnalysisPageShell should own overflow fo
 const scheduleAnalysis = read("src/components/ScheduleAnalysis.jsx");
 assert.match(scheduleAnalysis, /<AnalysisPageShell/, "ScheduleAnalysis should use the shared analysis shell");
 
+const chatWidget = read("src/components/ChatWidget.jsx");
+assert.match(chatWidget, /isFullPage \? 'w-full h-full flex-1 min-h-0'/, "ChatWidget full-page mode should claim the available shell height");
+assert.match(chatWidget, /flex-1 flex overflow-hidden relative \$\{isFullPage \? 'h-full min-h-0' : ''\}/, "ChatWidget full-page content area should be height-constrained");
+assert.match(chatWidget, /flex-1 flex flex-col overflow-hidden \$\{isFullPage \? 'h-full min-h-0' : ''\}/, "ChatWidget full-page message column should preserve a bottom-pinned input");
+
 console.log("comparison frontend smoke checks passed");

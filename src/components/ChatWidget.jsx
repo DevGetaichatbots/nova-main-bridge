@@ -3231,7 +3231,7 @@ const ChatWidget = ({
       {/* Chat Window - Always visible in full page mode */}
       {(isFullPage || isOpen) && (
         <div
-          className={`${isFullPage ? 'w-full h-full' : 'fixed z-50'} flex flex-col transition-all duration-500 transform ${
+          className={`${isFullPage ? 'w-full h-full flex-1 min-h-0' : 'fixed z-50'} flex flex-col transition-all duration-500 transform ${
             isFullPage || isOpen
               ? "opacity-100 scale-100 translate-y-0"
               : "opacity-0 scale-95 translate-y-8"
@@ -3429,7 +3429,7 @@ const ChatWidget = ({
           )}
 
           {/* Main Content Area with Sidebar */}
-          <div className={`flex-1 flex overflow-hidden relative ${isFullPage ? 'h-full' : ''}`}>
+          <div className={`flex-1 flex overflow-hidden relative ${isFullPage ? 'h-full min-h-0' : ''}`}>
             {/* Chat History Sidebar - Only show for logged-in users */}
             {user && !isMinimized && !isMobile && (
               <ChatHistorySidebar
@@ -3452,7 +3452,7 @@ const ChatWidget = ({
             )}
 
             {/* Messages Area */}
-            <div className={`flex-1 flex flex-col overflow-hidden ${isFullPage ? 'h-full' : ''}`}>
+            <div className={`flex-1 flex flex-col overflow-hidden ${isFullPage ? 'h-full min-h-0' : ''}`}>
               {/* Download All PDF Button - Fixed below header */}
               {hasTablesInMessages && !isLoadingSession && (
                 <div className="flex justify-end px-6 py-2 border-b border-gray-100 bg-white/80">
