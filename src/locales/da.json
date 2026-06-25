@@ -221,8 +221,8 @@
     "connectionError": "Cannot connect to server. The backend may not be accessible. Please try refreshing the page."
   },
   "support": {
-    "title": "Support Center",
-    "titleSmile": "Support Center :)",
+    "title": "Supportcenter",
+    "titleSmile": "Supportcenter :)",
     "subtitle": "Vi er her for at hjælpe dig",
     "description": "Har du brug for hjælp? Vi er her for at hjælpe dig. Udfyld formularen nedenfor, så vender vores team tilbage til dig hurtigst muligt.",
     "name": "Navn",
@@ -279,7 +279,7 @@
     "errorSubmit": "Kunne ikke indsende din anmodning. Prøv venligst igen senere eller kontakt os direkte."
   },
   "admin": {
-    "title": "Admin Portal",
+    "title": "Adminportal",
     "subtitle": "Administrer brugere og tilladelser",
     "addUser": "Tilføj bruger",
     "addUserTitle": "Tilføj ny bruger",
@@ -769,7 +769,7 @@
     "exportChat": "Eksporter Chat"
   },
   "superAdmin": {
-    "title": "Super Admin Portal",
+    "title": "Superadminportal",
     "subtitle": "Platform-dækkende administration for Nordic Construction A/S",
     "tabs": {
       "dashboard": "Dashboard",
