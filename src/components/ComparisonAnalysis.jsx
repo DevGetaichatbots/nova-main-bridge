@@ -365,7 +365,7 @@ const ComparisonAnalysis = ({ user }) => {
   }));
 
   return (
-    <div className="flex h-full bg-slate-50">
+    <div className="flex min-h-[calc(100vh-3.5rem)] bg-slate-50">
       <ScheduleAnalysisSidebar
         analyses={sidebarItems}
         activeAnalysisId={activeComparisonId}

@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 
 const root = process.cwd();
 const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const comparisonAnalysis = fs.readFileSync(path.join(root, "src/components/ComparisonAnalysis.jsx"), "utf8");
+const scheduleAnalysis = fs.readFileSync(path.join(root, "src/components/ScheduleAnalysis.jsx"), "utf8");
 
 const scheduleRouteBlock = app.match(/path="\/schedule-analysis"[\s\S]*?<ProtectedRoute>[\s\S]*?<\/ProtectedRoute>/);
 assert.ok(scheduleRouteBlock, "schedule analysis route should exist");
@@ -48,6 +50,28 @@ assert.match(
   app,
   /className="flex-1 min-h-0 pt-14"/,
   "viewport-constrained pages should preserve a flex child with min-h-0 below the navbar",
+);
+
+assert.doesNotMatch(
+  comparisonAnalysis,
+  /className="flex h-full bg-slate-50"/,
+  "comparison analysis should not depend on a parent height-only chain",
+);
+assert.match(
+  comparisonAnalysis,
+  /className="flex min-h-\[calc\(100vh-3\.5rem\)\] bg-slate-50"/,
+  "comparison analysis should anchor itself to the viewport below the fixed navbar",
+);
+
+assert.doesNotMatch(
+  scheduleAnalysis,
+  /className="flex h-full bg-slate-50"/,
+  "schedule analysis should not depend on a parent height-only chain",
+);
+assert.match(
+  scheduleAnalysis,
+  /className="flex min-h-\[calc\(100vh-3\.5rem\)\] bg-slate-50"/,
+  "schedule analysis should anchor itself to the viewport below the fixed navbar",
 );
 
 console.log("zoom scroll layout guards passed");
