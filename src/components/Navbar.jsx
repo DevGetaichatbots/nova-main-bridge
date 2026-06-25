@@ -163,6 +163,10 @@ const Navbar = ({ setUser: setAppUser }) => {
   };
 
   const getDisplayName = (user) => {
+    if (!user) {
+      return "";
+    }
+
     if (user.role === 'company_owner' || user.role === 'super_admin') {
       return user.companyName || user.displayName || user.email?.split('@')[0] || '';
     }
@@ -178,7 +182,7 @@ const Navbar = ({ setUser: setAppUser }) => {
   const homeRoute = restrictedSubdomain
     ? getRestrictedSubdomainHomeRoute(hasAuthenticatedUser)
     : "/";
-  const showComparisonNav = hasAuthenticatedUser;
+  const showComparisonNav = restrictedSubdomain ? hasAuthenticatedUser : Boolean(user);
   const showSupportNav = restrictedSubdomain ? hasAuthenticatedUser : true;
   const showFullProductNav = hasAuthenticatedUser && !restrictedSubdomain;
 
@@ -319,7 +323,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Admin Portal Link - Only visible to admin users */}
-            {showFullProductNav && user.role === "admin" && (
+            {showFullProductNav && user?.role === "admin" && (
               <Link
                 to="/admin"
                 className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
@@ -346,7 +350,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Company Portal Link - Visible to company owners and super admins */}
-            {showFullProductNav && (user.role === "company_owner" || user.role === "super_admin") && (
+            {showFullProductNav && (user?.role === "company_owner" || user?.role === "super_admin") && (
               <Link
                 to="/company-portal"
                 className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
@@ -373,7 +377,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Super Admin Portal Link - Only visible to super admins */}
-            {showFullProductNav && user.role === "super_admin" && (
+            {showFullProductNav && user?.role === "super_admin" && (
               <Link
                 to="/super-admin"
                 className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
@@ -732,7 +736,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Admin Portal Link - Mobile - Only visible to admin users */}
-            {showFullProductNav && user.role === "admin" && (
+            {showFullProductNav && user?.role === "admin" && (
               <Link
                 to="/admin"
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -756,7 +760,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Company Portal Link - Mobile - Visible to company owners and super admins */}
-            {showFullProductNav && (user.role === "company_owner" || user.role === "super_admin") && (
+            {showFullProductNav && (user?.role === "company_owner" || user?.role === "super_admin") && (
               <Link
                 to="/company-portal"
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -780,7 +784,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Super Admin Portal Link - Mobile - Only visible to super admins */}
-            {showFullProductNav && user.role === "super_admin" && (
+            {showFullProductNav && user?.role === "super_admin" && (
               <Link
                 to="/super-admin"
                 onClick={() => setIsMobileMenuOpen(false)}
