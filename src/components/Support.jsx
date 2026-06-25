@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import Toast from "./Toast";
 import { handleApiError } from "../utils/errorHandler";
+import { getFirstSupportErrorField } from "../utils/supportForm";
 
 const ALLOWED_SUPPORT_FILE_TYPES = [
   'image/jpeg',
@@ -60,11 +61,33 @@ const Support = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFileUrls, setUploadedFileUrls] = useState([]);
+  const fieldRefs = useRef({});
   const [toast, setToast] = useState({
     isVisible: false,
     message: "",
     type: "success",
   });
+
+  useEffect(() => {
+    const firstErrorField = getFirstSupportErrorField(errors);
+    if (!firstErrorField) {
+      return;
+    }
+
+    const targetField = fieldRefs.current[firstErrorField];
+    if (!targetField) {
+      return;
+    }
+
+    targetField.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    if (typeof targetField.focus === "function") {
+      targetField.focus({ preventScroll: true });
+    }
+  }, [errors]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -484,6 +507,9 @@ ${formData.description || "N/A"}${attachmentText}`;
                   {t('support.name')} <span className="text-red-500">*</span>
                 </label>
                 <input
+                  ref={(element) => {
+                    fieldRefs.current.name = element;
+                  }}
                   type="text"
                   name="name"
                   value={formData.name}
@@ -517,6 +543,9 @@ ${formData.description || "N/A"}${attachmentText}`;
                   {t('support.phone')}
                 </label>
                 <input
+                  ref={(element) => {
+                    fieldRefs.current.phone = element;
+                  }}
                   type="tel"
                   name="phone"
                   value={formData.phone}
@@ -556,6 +585,9 @@ ${formData.description || "N/A"}${attachmentText}`;
                 {t('support.email')} <span className="text-red-500">*</span>
               </label>
               <input
+                ref={(element) => {
+                  fieldRefs.current.email = element;
+                }}
                 type="email"
                 name="email"
                 value={formData.email}
@@ -614,6 +646,9 @@ ${formData.description || "N/A"}${attachmentText}`;
                 {t('support.issueSummary')}
               </label>
               <input
+                ref={(element) => {
+                  fieldRefs.current.issue = element;
+                }}
                 type="text"
                 name="issue"
                 value={formData.issue}
@@ -644,6 +679,9 @@ ${formData.description || "N/A"}${attachmentText}`;
               </label>
               <div className="relative">
                 <select
+                  ref={(element) => {
+                    fieldRefs.current.priority = element;
+                  }}
                   name="priority"
                   value={formData.priority}
                   onChange={handleInputChange}
@@ -892,6 +930,9 @@ ${formData.description || "N/A"}${attachmentText}`;
                 {t('support.description_label')}
               </label>
               <textarea
+                ref={(element) => {
+                  fieldRefs.current.description = element;
+                }}
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}

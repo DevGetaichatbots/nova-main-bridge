@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import DOMPurify from 'dompurify';
 import { scheduleService } from '../services/scheduleService';
 import { localizePredictiveReportHtml } from '../utils/reportLocalization';
+import AnalysisPageShell from './AnalysisPageShell';
 import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
 import NusfToggle from './NusfToggle';
 
@@ -868,49 +869,39 @@ const ScheduleAnalysis = ({ user }) => {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] bg-slate-50">
-      <ScheduleAnalysisSidebar
-        analyses={analyses}
-        activeAnalysisId={activeAnalysisId}
-        onSelectAnalysis={setActiveAnalysisId}
-        onNewAnalysis={handleNewAnalysis}
-        onDeleteAnalysis={handleDeleteAnalysis}
-        onRenameAnalysis={handleRenameAnalysis}
-        isLoadingList={isLoadingList}
-        isCreating={isCreating}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-      />
-
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        {!sidebarOpen && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="absolute top-4 left-4 z-20 p-2 rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all"
-          >
-            <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+    <AnalysisPageShell
+      sidebar={(
+        <ScheduleAnalysisSidebar
+          analyses={analyses}
+          activeAnalysisId={activeAnalysisId}
+          onSelectAnalysis={setActiveAnalysisId}
+          onNewAnalysis={handleNewAnalysis}
+          onDeleteAnalysis={handleDeleteAnalysis}
+          onRenameAnalysis={handleRenameAnalysis}
+          isLoadingList={isLoadingList}
+          isCreating={isCreating}
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+      )}
+      sidebarOpen={sidebarOpen}
+      onOpenSidebar={() => setSidebarOpen(true)}
+      errorBanner={error && (
+        <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
+          <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        )}
-
-        {error && (
-          <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <span>{error}</span>
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
-
-        {renderMainContent()}
-      </div>
-    </div>
+        </div>
+      )}
+    >
+      {renderMainContent()}
+    </AnalysisPageShell>
   );
 };
 

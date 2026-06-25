@@ -29,6 +29,8 @@ assert.match(component, /sandbox="allow-scripts"/, "ComparisonAnalysis iframe sh
 assert.match(component, /<ChatWidget[\s\S]*oldSessionId=/, "ComparisonAnalysis should expose classic chat fallback with stored session IDs");
 assert.match(component, /<FileComparisonModal/, "ComparisonAnalysis should reuse FileComparisonModal");
 assert.match(component, /useNusf:\s*useNusf/, "ComparisonAnalysis should forward NUSF selection to dashboard generation");
+assert.match(component, /<AnalysisPageShell/, "ComparisonAnalysis should use the shared analysis shell");
+assert.doesNotMatch(component, /className="flex-1 overflow-y-auto bg-slate-50"/, "ComparisonAnalysis should not wrap full-page chat in an extra scroll container");
 
 const uploadModal = read("src/components/FileComparisonModal.jsx");
 assert.match(uploadModal, /useNusf,\s*\n\s*\}\);/, "FileComparisonModal should include useNusf in onFilesUploaded payload");
@@ -39,5 +41,14 @@ assert.match(app, /path="\/comparison"/, "App should register /comparison route"
 
 const navbar = read("src/components/Navbar.jsx");
 assert.match(navbar, /to="\/comparison"/, "Navbar should link to the comparison dashboard route");
+
+const shellPath = path.join(root, "src/components/AnalysisPageShell.jsx");
+assert.equal(fs.existsSync(shellPath), true, "AnalysisPageShell.jsx should exist");
+const shell = read("src/components/AnalysisPageShell.jsx");
+assert.match(shell, /h-\[calc\(100vh-3\.5rem\)\]/, "AnalysisPageShell should lock the analysis view to the viewport height below the navbar");
+assert.match(shell, /overflow-hidden/, "AnalysisPageShell should own overflow for sidebar and main panel");
+
+const scheduleAnalysis = read("src/components/ScheduleAnalysis.jsx");
+assert.match(scheduleAnalysis, /<AnalysisPageShell/, "ScheduleAnalysis should use the shared analysis shell");
 
 console.log("comparison frontend smoke checks passed");

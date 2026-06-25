@@ -5,6 +5,7 @@ import { comparisonService } from '../services/comparisonService';
 import { localizeComparisonDashboardHtml } from '../utils/reportLocalization';
 import ChatWidget from './ChatWidget';
 import FileComparisonModal from './FileComparisonModal';
+import AnalysisPageShell from './AnalysisPageShell';
 import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
 
 const Spinner = () => (
@@ -325,7 +326,7 @@ const ComparisonAnalysis = ({ user }) => {
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto bg-slate-50">
+        <div className="flex-1 min-h-0 bg-slate-50 overflow-hidden">
           {useClassic ? (
             <ChatWidget
               sessionId={activeComparison.session_id}
@@ -337,7 +338,9 @@ const ComparisonAnalysis = ({ user }) => {
               isFullPage={true}
             />
           ) : (
-            renderDashboard()
+            <div className="h-full overflow-y-auto">
+              {renderDashboard()}
+            </div>
           )}
         </div>
       </div>
@@ -365,49 +368,39 @@ const ComparisonAnalysis = ({ user }) => {
   }));
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] bg-slate-50">
-      <ScheduleAnalysisSidebar
-        analyses={sidebarItems}
-        activeAnalysisId={activeComparisonId}
-        onSelectAnalysis={setActiveComparisonId}
-        onNewAnalysis={handleNewComparison}
-        onDeleteAnalysis={handleDeleteComparison}
-        onRenameAnalysis={handleRenameComparison}
-        isLoadingList={isLoadingList}
-        isCreating={isCreating}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-      />
-
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        {!sidebarOpen && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="absolute top-4 left-4 z-20 p-2 rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all"
-          >
-            <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        )}
-
-        {error && (
-          <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
-            <span>{error}</span>
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">x</button>
-          </div>
-        )}
-
-        {renderMainContent()}
-      </div>
-
+    <AnalysisPageShell
+      sidebar={(
+        <ScheduleAnalysisSidebar
+          analyses={sidebarItems}
+          activeAnalysisId={activeComparisonId}
+          onSelectAnalysis={setActiveComparisonId}
+          onNewAnalysis={handleNewComparison}
+          onDeleteAnalysis={handleDeleteComparison}
+          onRenameAnalysis={handleRenameComparison}
+          isLoadingList={isLoadingList}
+          isCreating={isCreating}
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+      )}
+      sidebarOpen={sidebarOpen}
+      onOpenSidebar={() => setSidebarOpen(true)}
+      errorBanner={error && (
+        <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">x</button>
+        </div>
+      )}
+    >
+      {renderMainContent()}
+      
       <FileComparisonModal
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onFilesUploaded={handleFilesUploaded}
         sessionId={uploadSessionId}
       />
-    </div>
+    </AnalysisPageShell>
   );
 };
 
