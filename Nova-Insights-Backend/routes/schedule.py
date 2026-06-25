@@ -4,6 +4,10 @@ from utils.token_manager import decode_token
 from utils.audit_logger import log_audit_event
 from utils.redis_client import cache_get, cache_set, cache_delete
 from utils.pdf_generator import generate_schedule_analysis_pdf, generate_dashboard_pdf, sanitize_filename
+from utils.report_localization import (
+    localize_comparison_dashboard_html,
+    localize_predictive_report_html,
+)
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import secrets
@@ -15,6 +19,32 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 schedule_bp = Blueprint('schedule', __name__)
 
 AGENT_BASE_URL = "https://nova-ai-backend-dga5ffaudzceb0hr.japanwest-01.azurewebsites.net"
+
+
+def _localize_analysis_payload(analysis, language=None):
+    if not analysis:
+        return analysis
+
+    target_language = language or analysis.get('language', 'en')
+    if analysis.get('predictive_insights'):
+        analysis['predictive_insights'] = localize_predictive_report_html(
+            analysis['predictive_insights'],
+            target_language,
+        )
+    return analysis
+
+
+def _localize_comparison_payload(comparison, language=None):
+    if not comparison:
+        return comparison
+
+    target_language = language or comparison.get('language', 'en')
+    if comparison.get('dashboard_html'):
+        comparison['dashboard_html'] = localize_comparison_dashboard_html(
+            comparison['dashboard_html'],
+            target_language,
+        )
+    return comparison
 
 def get_current_user():
     token = None
@@ -251,6 +281,7 @@ def get_analysis(analysis_id):
                 analysis['created_at'] = analysis['created_at'].isoformat()
             if analysis.get('updated_at'):
                 analysis['updated_at'] = analysis['updated_at'].isoformat()
+            analysis = _localize_analysis_payload(analysis)
 
             response_data = {'success': True, 'analysis': analysis}
             try:
@@ -296,6 +327,7 @@ def download_analysis_pdf(analysis_id):
                 analysis['created_at'] = analysis['created_at'].isoformat()
 
             language = request.args.get('language', analysis.get('language', 'en'))
+            analysis = _localize_analysis_payload(analysis, language)
             user_info = {'name': user.get('name', ''), 'email': user.get('email', '')}
 
             pdf_buffer = generate_schedule_analysis_pdf(analysis, user_info, language)
@@ -496,7 +528,10 @@ def upload_and_analyze(analysis_id):
         try:
             if resp.status_code == 200:
                 result = resp.json()
-                predictive_insights = result.get('predictive_insights', '')
+                predictive_insights = localize_predictive_report_html(
+                    result.get('predictive_insights', ''),
+                    language,
+                )
                 processing_time = result.get('processing_time_seconds')
                 model = result.get('predictive_model', '')
                 reference_date = result.get('reference_date', '')
@@ -706,7 +741,10 @@ def v2_get_analysis_progress(analysis_id):
 
         if data.get('stage') == 'complete':
             result = data.get('result', {})
-            predictive_insights = result.get('predictive_insights', '')
+            predictive_insights = localize_predictive_report_html(
+                result.get('predictive_insights', ''),
+                data.get('language') or request.args.get('language') or 'en',
+            )
             if predictive_insights:
                 conn = get_db_connection()
                 if conn:
@@ -847,6 +885,7 @@ def get_comparison(comparison_id):
                 comparison['created_at'] = comparison['created_at'].isoformat()
             if comparison.get('updated_at'):
                 comparison['updated_at'] = comparison['updated_at'].isoformat()
+            comparison = _localize_comparison_payload(comparison)
 
             return jsonify({'success': True, 'comparison': comparison})
     except Exception as e:
@@ -886,6 +925,7 @@ def download_comparison_pdf(comparison_id):
                 comparison['created_at'] = comparison['created_at'].isoformat()
 
             language = request.args.get('language', comparison.get('language', 'en'))
+            comparison = _localize_comparison_payload(comparison, language)
             user_info = {'name': user.get('name', ''), 'email': user.get('email', '')}
             pdf_buffer = generate_dashboard_pdf(comparison, user_info, language)
 
@@ -1046,7 +1086,10 @@ def generate_comparison(comparison_id):
         )
         agent_resp.raise_for_status()
         payload = agent_resp.json()
-        dashboard_html = payload.get('response', '')
+        dashboard_html = localize_comparison_dashboard_html(
+            payload.get('response', ''),
+            language,
+        )
         elapsed = _time.time() - start
 
         conn = get_db_connection()

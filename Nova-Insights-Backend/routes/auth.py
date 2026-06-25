@@ -23,6 +23,15 @@ RATE_LIMIT_SIGNUP_WINDOW = 3600
 USER_CACHE_TTL = 300
 
 
+def get_cookie_settings():
+    """Use Secure+SameSite=None on HTTPS, and Lax cookies for local HTTP development."""
+    is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
+    return {
+        'secure': is_secure,
+        'samesite': 'None' if is_secure else 'Lax',
+    }
+
+
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
     """User registration endpoint with access + refresh tokens"""
@@ -160,14 +169,14 @@ def signup():
                 
                 resp = jsonify(response_data)
                 
-                is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
+                cookie_settings = get_cookie_settings()
                 
                 resp.set_cookie(
                     'accessToken',
                     access_token,
                     httponly=True,
-                    secure=is_secure,
-                    samesite='None',
+                    secure=cookie_settings['secure'],
+                    samesite=cookie_settings['samesite'],
                     max_age=86400,
                     path='/'
                 )
@@ -175,8 +184,8 @@ def signup():
                     'refreshToken',
                     refresh_token,
                     httponly=True,
-                    secure=is_secure,
-                    samesite='None',
+                    secure=cookie_settings['secure'],
+                    samesite=cookie_settings['samesite'],
                     max_age=604800,
                     path='/api/'
                 )
@@ -339,14 +348,14 @@ def login():
                 
                 resp = jsonify(response_data)
                 
-                is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
+                cookie_settings = get_cookie_settings()
                 
                 resp.set_cookie(
                     'accessToken',
                     access_token,
                     httponly=True,
-                    secure=is_secure,
-                    samesite='None',
+                    secure=cookie_settings['secure'],
+                    samesite=cookie_settings['samesite'],
                     max_age=86400,
                     path='/'
                 )
@@ -354,8 +363,8 @@ def login():
                     'refreshToken',
                     refresh_token,
                     httponly=True,
-                    secure=is_secure,
-                    samesite='None',
+                    secure=cookie_settings['secure'],
+                    samesite=cookie_settings['samesite'],
                     max_age=604800,
                     path='/api/'
                 )
@@ -580,14 +589,14 @@ def refresh_access_token():
                     'message': 'Token opdateret'
                 })
                 
-                is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
+                cookie_settings = get_cookie_settings()
                 
                 resp.set_cookie(
                     'accessToken',
                     new_access_token,
                     httponly=True,
-                    secure=is_secure,
-                    samesite='None',
+                    secure=cookie_settings['secure'],
+                    samesite=cookie_settings['samesite'],
                     max_age=86400,
                     path='/'
                 )

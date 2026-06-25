@@ -1,7 +1,7 @@
 
 // Backend URL configuration
 export const getApiBaseUrl = () => {
-  return 'https://nova-insights-backend-agbwabeeg9afe4hk.denmarkeast-01.azurewebsites.net';
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 };
 
 export const API_ENDPOINTS = {

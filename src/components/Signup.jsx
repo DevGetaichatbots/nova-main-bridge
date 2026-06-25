@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from 'react-i18next';
 import { handleApiError } from '../utils/errorHandler';
+import { nameContainsDigits } from '../utils/nameValidation';
 
 const Signup = ({ setUser }) => {
   const { t } = useTranslation();
@@ -46,10 +47,14 @@ const Signup = ({ setUser }) => {
 
     if (!formData.firstName.trim()) {
       newErrors.firstName = t('signup.firstNameRequired');
+    } else if (nameContainsDigits(formData.firstName)) {
+      newErrors.firstName = t('signup.firstNameInvalid');
     }
 
     if (!formData.lastName.trim()) {
       newErrors.lastName = t('signup.lastNameRequired');
+    } else if (nameContainsDigits(formData.lastName)) {
+      newErrors.lastName = t('signup.lastNameInvalid');
     }
 
     if (!formData.email) {

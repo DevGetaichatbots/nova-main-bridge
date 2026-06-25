@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next';
 import DOMPurify from 'dompurify';
 import { scheduleService } from '../services/scheduleService';
+import { localizePredictiveReportHtml } from '../utils/reportLocalization';
 import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
 import NusfToggle from './NusfToggle';
 
@@ -478,8 +479,9 @@ const ScheduleAnalysis = ({ user }) => {
   };
 
   const renderUploadZone = () => (
-    <div className="flex-1 flex items-center justify-center p-8">
-      <div className="w-full max-w-lg space-y-4">
+    <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="min-h-full flex justify-center px-8 py-8 md:items-center">
+        <div className="w-full max-w-lg space-y-4">
         <div
           className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 cursor-pointer ${
             dragOver
@@ -556,6 +558,7 @@ const ScheduleAnalysis = ({ user }) => {
             </button>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -636,7 +639,7 @@ const ScheduleAnalysis = ({ user }) => {
     );
 
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <style>{`
           @keyframes scanLine {
             0%, 100% { top: 15%; opacity: 0.3; }
@@ -647,42 +650,44 @@ const ScheduleAnalysis = ({ user }) => {
             to { transform: rotate(360deg); }
           }
         `}</style>
-        <div className="text-center max-w-sm w-full">
-          {isThinking ? renderThinkingIcon() : renderScanIcon()}
+        <div className="min-h-full flex items-center justify-center p-8">
+          <div className="text-center max-w-sm w-full">
+            {isThinking ? renderThinkingIcon() : renderScanIcon()}
 
-          <h3 className="text-lg font-bold text-slate-800 mb-1">
-            {isThinking ? t('scheduleAnalysis.processing.thinking') : t('scheduleAnalysis.processing.title')}
-          </h3>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">
+              {isThinking ? t('scheduleAnalysis.processing.thinking') : t('scheduleAnalysis.processing.title')}
+            </h3>
 
-          <p className="text-sm text-[#00B4B4] font-medium mb-6 min-h-[40px] transition-all duration-500">
-            {displayMessage}
-            <span className="inline-flex ml-0.5 gap-[3px] align-baseline">
-              <span className="w-1 h-1 rounded-full bg-[#00B4B4] animate-bounce" style={{ animationDelay: '0s', animationDuration: '0.8s' }} />
-              <span className="w-1 h-1 rounded-full bg-[#00B4B4] animate-bounce" style={{ animationDelay: '0.15s', animationDuration: '0.8s' }} />
-              <span className="w-1 h-1 rounded-full bg-[#00B4B4] animate-bounce" style={{ animationDelay: '0.3s', animationDuration: '0.8s' }} />
-            </span>
-          </p>
+            <p className="text-sm text-[#00B4B4] font-medium mb-6 min-h-[40px] transition-all duration-500">
+              {displayMessage}
+              <span className="inline-flex ml-0.5 gap-[3px] align-baseline">
+                <span className="w-1 h-1 rounded-full bg-[#00B4B4] animate-bounce" style={{ animationDelay: '0s', animationDuration: '0.8s' }} />
+                <span className="w-1 h-1 rounded-full bg-[#00B4B4] animate-bounce" style={{ animationDelay: '0.15s', animationDuration: '0.8s' }} />
+                <span className="w-1 h-1 rounded-full bg-[#00B4B4] animate-bounce" style={{ animationDelay: '0.3s', animationDuration: '0.8s' }} />
+              </span>
+            </p>
 
-          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-3">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-[#1eb5ee] to-[#00B4B4]"
-              style={{
-                width: `${Math.max(progressPercent, 5)}%`,
-                transition: 'width 1s ease-out',
-              }}
-            />
-          </div>
+            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#1eb5ee] to-[#00B4B4]"
+                style={{
+                  width: `${Math.max(progressPercent, 5)}%`,
+                  transition: 'width 1s ease-out',
+                }}
+              />
+            </div>
 
-          <p className="text-xs text-slate-400">
-            {displayStep}
-          </p>
+            <p className="text-xs text-slate-400">
+              {displayStep}
+            </p>
 
-          <div className="mt-6 flex items-center justify-center">
-            <img
-              src="/azure-badge.jpg"
-              alt="Microsoft Azure"
-              className="h-6 object-contain border border-gray-200 px-3 pb-0.5 rounded-full opacity-50"
-            />
+            <div className="mt-6 flex items-center justify-center">
+              <img
+                src="/azure-badge.jpg"
+                alt="Microsoft Azure"
+                className="h-6 object-contain border border-gray-200 px-3 pb-0.5 rounded-full opacity-50"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -706,13 +711,13 @@ const ScheduleAnalysis = ({ user }) => {
   // Memoized DOMPurify sanitization — recomputes only when the raw HTML changes
   const sanitized = useMemo(() => {
     if (!activeAnalysis?.predictive_insights) return '';
-    return DOMPurify.sanitize(activeAnalysis.predictive_insights, {
+    return DOMPurify.sanitize(localizePredictiveReportHtml(activeAnalysis.predictive_insights, i18n.language), {
       ADD_TAGS: ['style'],
       ADD_ATTR: ['style', 'class'],
       FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
       FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover'],
     });
-  }, [activeAnalysis?.predictive_insights]);
+  }, [activeAnalysis?.predictive_insights, i18n.language]);
 
   const renderReport = () => {
     if (!activeAnalysis?.predictive_insights) return null;
@@ -799,8 +804,9 @@ const ScheduleAnalysis = ({ user }) => {
   };
 
   const renderWelcome = () => (
-    <div className="flex-1 flex items-center justify-center p-8">
-      <div className="text-center max-w-md">
+    <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="min-h-full flex items-center justify-center p-8">
+        <div className="text-center max-w-md">
         <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#1eb5ee]/10 to-[#00B4B4]/10 flex items-center justify-center">
           <svg className="w-10 h-10 text-[#00B4B4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -835,6 +841,7 @@ const ScheduleAnalysis = ({ user }) => {
             alt="Microsoft Azure"
             className="h-8 object-contain border border-gray-200 px-4 pb-1 rounded-full"
           />
+        </div>
         </div>
       </div>
     </div>

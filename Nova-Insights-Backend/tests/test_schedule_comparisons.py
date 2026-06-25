@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
+from datetime import datetime
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -131,7 +132,7 @@ class _AgentResponse:
     status_code = 200
 
     def json(self):
-        return {"response": "<html><body>dashboard</body></html>"}
+        return {"response": "<html><body><h1>Comparison Results</h1><div>Project Health</div></body></html>"}
 
     def raise_for_status(self):
         return None
@@ -159,7 +160,7 @@ class ScheduleComparisonTests(unittest.TestCase):
             "new_session_id": "new_1",
             "old_filename": "old.csv",
             "new_filename": "new.csv",
-            "language": "en",
+            "language": "da",
             "use_nusf": True,
         }
         first_conn = _Connection()
@@ -178,6 +179,9 @@ class ScheduleComparisonTests(unittest.TestCase):
         self.assertIn("status='processing'", first_conn.cursor_obj.executed[0][0])
         self.assertIn(True, first_conn.cursor_obj.executed[0][1])
         self.assertIn("dashboard_html=%s", second_conn.cursor_obj.executed[0][0])
+        saved_dashboard_html = second_conn.cursor_obj.executed[0][1][0]
+        self.assertIn("Sammenligningsresultater", saved_dashboard_html)
+        self.assertIn("Projektsundhed", saved_dashboard_html)
         self.assertTrue(first_conn.committed)
         self.assertTrue(second_conn.committed)
 
@@ -231,6 +235,25 @@ class ScheduleComparisonTests(unittest.TestCase):
         self.assertIn("dashboard_html", query)
         self.assertEqual(params, ("cmp_123", 7))
         self.assertTrue(conn.closed)
+
+    def test_get_comparison_localizes_dashboard_html_for_danish(self):
+        comparison = {
+            "comparison_id": "cmp_123",
+            "status": "completed",
+            "dashboard_html": "<html><body><h1>Comparison Results</h1><div>Project Health</div></body></html>",
+            "language": "da",
+            "created_at": datetime(2026, 6, 23, 9, 30, 0),
+            "updated_at": datetime(2026, 6, 23, 9, 35, 0),
+        }
+        conn = _Connection(rows=[comparison])
+
+        with patch.object(schedule, "get_current_user", return_value={"user_id": 7}), \
+             patch.object(schedule, "get_db_connection", return_value=conn):
+            result = schedule.get_comparison("cmp_123")
+
+        self.assertEqual(result["success"], True)
+        self.assertIn("Sammenligningsresultater", result["comparison"]["dashboard_html"])
+        self.assertIn("Projektsundhed", result["comparison"]["dashboard_html"])
 
 
 if __name__ == "__main__":

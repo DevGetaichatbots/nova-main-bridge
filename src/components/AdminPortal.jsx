@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import axios from "axios";
 import { getApiBaseUrl } from "../utils/apiConfig";
 import CustomSelect from "./CustomSelect";
+import { nameContainsDigits } from "../utils/nameValidation";
 
 const AdminPortal = () => {
   const { t } = useTranslation();
@@ -203,7 +204,9 @@ const AdminPortal = () => {
   const validateForm = (isEdit = false) => {
     const errors = {};
     if (!formData.firstName.trim()) errors.firstName = t('admin.validation.firstNameRequired');
+    else if (nameContainsDigits(formData.firstName)) errors.firstName = t('admin.validation.firstNameInvalid');
     if (!formData.lastName.trim()) errors.lastName = t('admin.validation.lastNameRequired');
+    else if (nameContainsDigits(formData.lastName)) errors.lastName = t('admin.validation.lastNameInvalid');
     if (!formData.email.trim()) errors.email = t('admin.validation.emailRequired');
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = t('admin.validation.emailInvalid');

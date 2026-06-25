@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from 'react-i18next';
+import { nameContainsDigits } from '../utils/nameValidation';
 
 const UpdateProfile = () => {
   const { t } = useTranslation();
@@ -61,10 +62,14 @@ const UpdateProfile = () => {
 
     if (!formData.firstName.trim()) {
       newErrors.firstName = t('profile.firstNameRequired');
+    } else if (nameContainsDigits(formData.firstName)) {
+      newErrors.firstName = t('profile.firstNameInvalid');
     }
 
     if (!formData.lastName.trim()) {
       newErrors.lastName = t('profile.lastNameRequired');
+    } else if (nameContainsDigits(formData.lastName)) {
+      newErrors.lastName = t('profile.lastNameInvalid');
     }
 
     setErrors(newErrors);

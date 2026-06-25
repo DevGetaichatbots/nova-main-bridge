@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getWithAuth, postWithAuth, putWithAuth, deleteWithAuth } from '../utils/authApi';
+import { nameContainsDigits } from '../utils/nameValidation';
 
 function useDebounce(value, delay = 400) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -291,7 +292,9 @@ const CompanyPortal = () => {
   const validateForm = (isEdit = false) => {
     const errors = {};
     if (!formData.firstName.trim()) errors.firstName = t('admin.validation.firstNameRequired');
+    else if (nameContainsDigits(formData.firstName)) errors.firstName = t('admin.validation.firstNameInvalid');
     if (!formData.lastName.trim()) errors.lastName = t('admin.validation.lastNameRequired');
+    else if (nameContainsDigits(formData.lastName)) errors.lastName = t('admin.validation.lastNameInvalid');
     if (!formData.email.trim()) errors.email = t('admin.validation.emailRequired');
     else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = t('admin.validation.emailInvalid');
     if (!isEdit && !formData.password) errors.password = t('admin.validation.passwordRequired');
@@ -300,7 +303,7 @@ const CompanyPortal = () => {
     if (formData.phoneNumber && formData.phoneNumber.trim()) {
       const cleaned = formData.phoneNumber.replace(/[\s\-\(\)\+]/g, '');
       if (!/^\d+$/.test(cleaned) || cleaned.length < 6 || cleaned.length > 15) {
-        errors.phoneNumber = t('admin.phoneError');
+        errors.phoneNumber = t('admin.validation.phoneError');
       }
     }
     
@@ -1021,8 +1024,8 @@ const CompanyPortal = () => {
         )}
 
         {(showAddModal || showEditModal) && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setShowAddModal(false); setShowEditModal(false); resetForm(); }}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto overscroll-contain sm:items-center">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain p-6" onClick={e => e.stopPropagation()}>
               <h3 className="text-xl font-bold text-gray-800 mb-6">
                 {showAddModal ? t('companyPortal.addUserTitle') : t('companyPortal.editUser')}
               </h3>

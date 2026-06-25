@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { chatService } from '../services/chatService';
 import { comparisonService } from '../services/comparisonService';
+import { localizeComparisonDashboardHtml } from '../utils/reportLocalization';
 import ChatWidget from './ChatWidget';
 import FileComparisonModal from './FileComparisonModal';
 import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
@@ -204,11 +205,11 @@ const ComparisonAnalysis = ({ user }) => {
   const renderDashboard = () => (
     <iframe
       ref={iframeRef}
-      srcDoc={activeComparison.dashboard_html}
+      srcDoc={localizeComparisonDashboardHtml(activeComparison.dashboard_html, i18n.language)}
       sandbox="allow-scripts"
       style={{ width: '100%', minHeight: '100vh', border: 'none', display: 'block' }}
       onLoad={handleIframeLoad}
-      title="Project Health Dashboard"
+      title={i18n.language?.startsWith('da') ? 'Projektsundhed Dashboard' : 'Project Health Dashboard'}
     />
   );
 
@@ -222,9 +223,13 @@ const ComparisonAnalysis = ({ user }) => {
             <Spinner />
           </div>
         </div>
-        <h3 className="text-lg font-bold text-slate-800 mb-2">Generating project health dashboard</h3>
+        <h3 className="text-lg font-bold text-slate-800 mb-2">
+          {i18n.language?.startsWith('da') ? 'Genererer projektsundhedsdashboard' : 'Generating project health dashboard'}
+        </h3>
         <p className="text-sm text-slate-500 mb-5">
-          Nova is comparing the uploaded schedules and preparing the v5 graph view.
+          {i18n.language?.startsWith('da')
+            ? 'Nova sammenligner de uploadede tidsplaner og forbereder v5-grafvisningen.'
+            : 'Nova is comparing the uploaded schedules and preparing the v5 graph view.'}
         </p>
         <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
           <div
@@ -247,9 +252,13 @@ const ComparisonAnalysis = ({ user }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">Project Health Dashboard</h2>
+        <h2 className="text-2xl font-bold text-slate-800 mb-3">
+          {i18n.language?.startsWith('da') ? 'Projektsundhed Dashboard' : 'Project Health Dashboard'}
+        </h2>
         <p className="text-slate-500 mb-6">
-          Upload two schedules to generate the v5 graph dashboard automatically.
+          {i18n.language?.startsWith('da')
+            ? 'Upload to tidsplaner for automatisk at generere v5-grafdashboardet.'
+            : 'Upload two schedules to generate the v5 graph dashboard automatically.'}
         </p>
         <button
           onClick={handleNewComparison}
@@ -261,7 +270,7 @@ const ComparisonAnalysis = ({ user }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           )}
-          New Comparison
+          {i18n.language?.startsWith('da') ? 'Ny Sammenligning' : 'New Comparison'}
         </button>
       </div>
     </div>
@@ -278,8 +287,14 @@ const ComparisonAnalysis = ({ user }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
         </div>
-        <h3 className="text-xl font-bold text-slate-800 mb-2">Upload old and new schedules</h3>
-        <p className="text-slate-500">The dashboard will be generated after both files finish processing.</p>
+        <h3 className="text-xl font-bold text-slate-800 mb-2">
+          {i18n.language?.startsWith('da') ? 'Upload gammel og ny tidsplan' : 'Upload old and new schedules'}
+        </h3>
+        <p className="text-slate-500">
+          {i18n.language?.startsWith('da')
+            ? 'Dashboardet bliver genereret, når begge filer er færdigbehandlet.'
+            : 'The dashboard will be generated after both files finish processing.'}
+        </p>
       </button>
     </div>
   );
@@ -304,7 +319,9 @@ const ComparisonAnalysis = ({ user }) => {
               onClick={() => setUseClassic(v => !v)}
               className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all"
             >
-              {useClassic ? 'Show Dashboard' : 'Use Classic Analysis'}
+              {useClassic
+                ? (i18n.language?.startsWith('da') ? 'Vis Dashboard' : 'Show Dashboard')
+                : (i18n.language?.startsWith('da') ? 'Brug Klassisk Analyse' : 'Use Classic Analysis')}
             </button>
           </div>
         </div>
