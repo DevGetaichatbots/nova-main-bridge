@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from 'react-i18next';
 import { handleApiError } from '../utils/errorHandler';
 import { nameContainsDigits } from '../utils/nameValidation';
+import { getPostLoginRoute } from "../utils/hostAccess";
 
 const Signup = ({ setUser }) => {
   const { t } = useTranslation();
@@ -24,7 +25,7 @@ const Signup = ({ setUser }) => {
     const user = localStorage.getItem("user");
     
     if (user) {
-      navigate("/", { replace: true });
+      navigate(getPostLoginRoute(), { replace: true });
     }
   }, [navigate]);
 
@@ -132,7 +133,7 @@ const Signup = ({ setUser }) => {
         window.dispatchEvent(new Event("authChange"));
 
         console.log("✅ Registration successful:", data.user.email);
-        navigate("/");
+        navigate(getPostLoginRoute());
       } else {
         const errorMessage = data.error || data.message || t('signup.signupError');
         setErrors({ general: errorMessage });

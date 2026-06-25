@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { useTranslation } from "react-i18next";
 import { chatService } from "./services/chatService";
 import { putWithAuth, postWithAuth } from "./utils/authApi";
+import {
+  getRestrictedSubdomainHomeRoute,
+  isAllowedRestrictedSubdomainPath,
+  isRestrictedSubdomain,
+} from "./utils/hostAccess";
 
 // Always-eager: rendered on every page or needed for auth gating
 import Navbar from "./components/Navbar";
@@ -57,6 +62,15 @@ const PageLoader = () => (
     </div>
   </div>
 );
+
+const RestrictedSubdomainRedirect = ({ children, path }) => {
+  if (!isRestrictedSubdomain() || isAllowedRestrictedSubdomainPath(path)) {
+    return children;
+  }
+
+  const hasUser = Boolean(localStorage.getItem("user"));
+  return <Navigate to={getRestrictedSubdomainHomeRoute(hasUser)} replace />;
+};
 
 // Floating Background Elements Component for File Comparison Theme
 const FloatingElements = () => {
@@ -1034,6 +1048,8 @@ const SavedFilesSection = ({ sessionId }) => {
 
 function App() {
   const [isLoaded, setIsLoaded] = useState(false);
+  const hasStoredUser =
+    typeof window !== "undefined" && Boolean(localStorage.getItem("user"));
   // Initialize sessionId and isChatWidgetOpen from localStorage for persistence across refreshes
   const [sessionId, setSessionId] = useState(() => {
     const saved = localStorage.getItem('currentChatSessionId');
@@ -2279,29 +2295,38 @@ function App() {
           <Route
             path="/"
             element={
-              <ProtectedRoute>
-                <div className="min-h-screen flex flex-col">
-                  <Navbar user={user} setUser={setUser} />
-                  <div className="flex-1">
-                    <HomePage />
+              isRestrictedSubdomain() ? (
+                <Navigate
+                  to={getRestrictedSubdomainHomeRoute(Boolean(user) || hasStoredUser)}
+                  replace
+                />
+              ) : (
+                <ProtectedRoute>
+                  <div className="min-h-screen flex flex-col">
+                    <Navbar user={user} setUser={setUser} />
+                    <div className="flex-1">
+                      <HomePage />
+                    </div>
+                    <Footer />
                   </div>
-                  <Footer />
-                </div>
-              </ProtectedRoute>
+                </ProtectedRoute>
+              )
             }
           />
           <Route
             path="/profile"
             element={
-              <ProtectedRoute>
-                <div className="min-h-screen flex flex-col">
-                  <Navbar user={user} setUser={setUser} />
-                  <div className="flex-1">
-                    <UpdateProfile />
+              <RestrictedSubdomainRedirect path="/profile">
+                <ProtectedRoute>
+                  <div className="min-h-screen flex flex-col">
+                    <Navbar user={user} setUser={setUser} />
+                    <div className="flex-1">
+                      <UpdateProfile />
+                    </div>
+                    <Footer />
                   </div>
-                  <Footer />
-                </div>
-              </ProtectedRoute>
+                </ProtectedRoute>
+              </RestrictedSubdomainRedirect>
             }
           />
           <Route
@@ -2321,40 +2346,44 @@ function App() {
           <Route
             path="/chat"
             element={
-              <ProtectedRoute>
-                <div className="h-screen flex flex-col overflow-hidden">
-                  <Navbar user={user} setUser={setUser} />
-                  <div className="flex-1 overflow-hidden pt-14">
-                    <ChatWidget
-                      key={chatWidgetKey}
-                      sessionId={sessionId}
-                      user={user}
-                      getSessionFileCount={getSessionFileCount}
-                      onEndSession={handleEndSession}
-                      pendingUploadResult={pendingUploadResult}
-                      onUploadResultProcessed={() => setPendingUploadResult(null)}
-                      shouldAutoOpen={true}
-                      tableSessionIds={tableSessionIds}
-                      onFilesUploaded={handleFilesUploaded}
-                      onSessionChange={handleSessionChange}
-                      isFullPage={true}
-                    />
+              <RestrictedSubdomainRedirect path="/chat">
+                <ProtectedRoute>
+                  <div className="h-screen flex flex-col overflow-hidden">
+                    <Navbar user={user} setUser={setUser} />
+                    <div className="flex-1 overflow-hidden pt-14">
+                      <ChatWidget
+                        key={chatWidgetKey}
+                        sessionId={sessionId}
+                        user={user}
+                        getSessionFileCount={getSessionFileCount}
+                        onEndSession={handleEndSession}
+                        pendingUploadResult={pendingUploadResult}
+                        onUploadResultProcessed={() => setPendingUploadResult(null)}
+                        shouldAutoOpen={true}
+                        tableSessionIds={tableSessionIds}
+                        onFilesUploaded={handleFilesUploaded}
+                        onSessionChange={handleSessionChange}
+                        isFullPage={true}
+                      />
+                    </div>
                   </div>
-                </div>
-              </ProtectedRoute>
+                </ProtectedRoute>
+              </RestrictedSubdomainRedirect>
             }
           />
           <Route
             path="/schedule-analysis"
             element={
-              <ProtectedRoute>
-                <div className="h-screen flex flex-col overflow-hidden">
-                  <Navbar user={user} setUser={setUser} />
-                  <div className="flex-1 overflow-hidden pt-14">
-                    <ScheduleAnalysis user={user} />
+              <RestrictedSubdomainRedirect path="/schedule-analysis">
+                <ProtectedRoute>
+                  <div className="h-screen flex flex-col overflow-hidden">
+                    <Navbar user={user} setUser={setUser} />
+                    <div className="flex-1 overflow-hidden pt-14">
+                      <ScheduleAnalysis user={user} />
+                    </div>
                   </div>
-                </div>
-              </ProtectedRoute>
+                </ProtectedRoute>
+              </RestrictedSubdomainRedirect>
             }
           />
           <Route
@@ -2374,15 +2403,17 @@ function App() {
           <Route
             path="/admin"
             element={
-              <AdminRoute>
-                <div className="min-h-screen flex flex-col">
-                  <Navbar user={user} setUser={setUser} />
-                  <div className="flex-1">
-                    <AdminPortal />
+              <RestrictedSubdomainRedirect path="/admin">
+                <AdminRoute>
+                  <div className="min-h-screen flex flex-col">
+                    <Navbar user={user} setUser={setUser} />
+                    <div className="flex-1">
+                      <AdminPortal />
+                    </div>
+                    <Footer />
                   </div>
-                  <Footer />
-                </div>
-              </AdminRoute>
+                </AdminRoute>
+              </RestrictedSubdomainRedirect>
             }
           />
 
@@ -2393,36 +2424,78 @@ function App() {
           <Route
             path="/signup"
             element={
-              <ProtectedRoute>
-                <Signup setUser={setUser} />
-              </ProtectedRoute>
+              <Signup setUser={setUser} />
             }
           />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/verify-otp" element={<VerifyOTP />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/security-gdpr" element={<SecurityGDPR user={user} setUser={setUser} />} />
-          <Route path="/contact" element={<ContactPage user={user} setUser={setUser} />} />
-          <Route path="/about" element={<AboutPage user={user} setUser={setUser} />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicyPage user={user} setUser={setUser} />} />
-          <Route path="/terms-of-service" element={<TermsOfServicePage user={user} setUser={setUser} />} />
+          <Route
+            path="/security-gdpr"
+            element={
+              <RestrictedSubdomainRedirect path="/security-gdpr">
+                <SecurityGDPR user={user} setUser={setUser} />
+              </RestrictedSubdomainRedirect>
+            }
+          />
+          <Route
+            path="/contact"
+            element={
+              <RestrictedSubdomainRedirect path="/contact">
+                <ContactPage user={user} setUser={setUser} />
+              </RestrictedSubdomainRedirect>
+            }
+          />
+          <Route
+            path="/about"
+            element={
+              <RestrictedSubdomainRedirect path="/about">
+                <AboutPage user={user} setUser={setUser} />
+              </RestrictedSubdomainRedirect>
+            }
+          />
+          <Route
+            path="/privacy-policy"
+            element={
+              <RestrictedSubdomainRedirect path="/privacy-policy">
+                <PrivacyPolicyPage user={user} setUser={setUser} />
+              </RestrictedSubdomainRedirect>
+            }
+          />
+          <Route
+            path="/terms-of-service"
+            element={
+              <RestrictedSubdomainRedirect path="/terms-of-service">
+                <TermsOfServicePage user={user} setUser={setUser} />
+              </RestrictedSubdomainRedirect>
+            }
+          />
           
           {/* Company Registration - Public Route */}
-          <Route path="/company-signup" element={<CompanySignup setUser={setUser} />} />
+          <Route
+            path="/company-signup"
+            element={
+              <RestrictedSubdomainRedirect path="/company-signup">
+                <CompanySignup setUser={setUser} />
+              </RestrictedSubdomainRedirect>
+            }
+          />
           
           {/* Company Portal - Only accessible to company owners */}
           <Route
             path="/company-portal"
             element={
-              <CompanyOwnerRoute>
-                <div className="min-h-screen flex flex-col">
-                  <Navbar user={user} setUser={setUser} />
-                  <div className="flex-1">
-                    <CompanyPortal />
+              <RestrictedSubdomainRedirect path="/company-portal">
+                <CompanyOwnerRoute>
+                  <div className="min-h-screen flex flex-col">
+                    <Navbar user={user} setUser={setUser} />
+                    <div className="flex-1">
+                      <CompanyPortal />
+                    </div>
+                    <Footer />
                   </div>
-                  <Footer />
-                </div>
-              </CompanyOwnerRoute>
+                </CompanyOwnerRoute>
+              </RestrictedSubdomainRedirect>
             }
           />
           
@@ -2430,20 +2503,34 @@ function App() {
           <Route
             path="/super-admin"
             element={
-              <SuperAdminRoute>
-                <div className="min-h-screen flex flex-col">
-                  <Navbar user={user} setUser={setUser} />
-                  <div className="flex-1">
-                    <SuperAdminPortal />
+              <RestrictedSubdomainRedirect path="/super-admin">
+                <SuperAdminRoute>
+                  <div className="min-h-screen flex flex-col">
+                    <Navbar user={user} setUser={setUser} />
+                    <div className="flex-1">
+                      <SuperAdminPortal />
+                    </div>
+                    <Footer />
                   </div>
-                  <Footer />
-                </div>
-              </SuperAdminRoute>
+                </SuperAdminRoute>
+              </RestrictedSubdomainRedirect>
             }
           />
           
           {/* 404 Not Found - Catch all unmatched routes */}
-          <Route path="*" element={<NotFound />} />
+          <Route
+            path="*"
+            element={
+              isRestrictedSubdomain() ? (
+                <Navigate
+                  to={getRestrictedSubdomainHomeRoute(Boolean(user) || hasStoredUser)}
+                  replace
+                />
+              ) : (
+                <NotFound />
+              )
+            }
+          />
         </Routes>
         </Suspense>
       </ErrorBoundary>

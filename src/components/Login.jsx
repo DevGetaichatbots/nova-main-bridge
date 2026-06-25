@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from 'react-i18next';
 import { handleApiError } from '../utils/errorHandler';
+import { getPostLoginRoute } from "../utils/hostAccess";
 
 const Login = ({ setUser }) => {
   const { t } = useTranslation();
@@ -20,7 +21,7 @@ const Login = ({ setUser }) => {
     const user = localStorage.getItem("user");
     
     if (user) {
-      navigate("/", { replace: true });
+      navigate(getPostLoginRoute(), { replace: true });
       return;
     }
 
@@ -124,7 +125,7 @@ const Login = ({ setUser }) => {
 
         console.log('✅ Login successful:', data.user.email);
         // Redirect to home or dashboard
-        navigate('/');
+        navigate(getPostLoginRoute());
       } else {
         // API returns 'error' field for error messages
         const errorMessage = data.error || data.message || t('login.loginError');

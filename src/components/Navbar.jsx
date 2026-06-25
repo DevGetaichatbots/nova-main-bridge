@@ -3,6 +3,11 @@ import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "./LanguageSwitcher";
+import {
+  getPostLogoutRoute,
+  getRestrictedSubdomainHomeRoute,
+  isRestrictedSubdomain,
+} from "../utils/hostAccess";
 
 const Navbar = ({ setUser: setAppUser }) => {
   const { t } = useTranslation();
@@ -149,7 +154,7 @@ const Navbar = ({ setUser: setAppUser }) => {
       );
 
       // Navigate immediately without delay
-      navigate("/");
+      navigate(getPostLogoutRoute());
     }
   };
 
@@ -166,6 +171,16 @@ const Navbar = ({ setUser: setAppUser }) => {
 
   const isCompanyOwner = user?.role === 'company_owner';
   const isSuperAdmin = user?.role === 'super_admin';
+  const hasAuthenticatedUser =
+    Boolean(user) ||
+    (typeof window !== "undefined" && Boolean(localStorage.getItem("user")));
+  const restrictedSubdomain = isRestrictedSubdomain();
+  const homeRoute = restrictedSubdomain
+    ? getRestrictedSubdomainHomeRoute(hasAuthenticatedUser)
+    : "/";
+  const showComparisonNav = hasAuthenticatedUser;
+  const showSupportNav = restrictedSubdomain ? hasAuthenticatedUser : true;
+  const showFullProductNav = hasAuthenticatedUser && !restrictedSubdomain;
 
   const isActive = (path) => location.pathname === path;
 
@@ -181,7 +196,7 @@ const Navbar = ({ setUser: setAppUser }) => {
       <div className="relative max-w-screen-2xl w-full mx-auto px-6">
         <div className="relative flex items-center justify-between h-14">
           {/* Logo Section - Logo Only */}
-          <Link to="/" className="group flex items-center flex-shrink-0">
+          <Link to={homeRoute} className="group flex items-center flex-shrink-0">
             <div className="relative transition-all duration-300 group-hover:scale-105">
               <img
                 src="/NordicLogo2.png"
@@ -194,14 +209,15 @@ const Navbar = ({ setUser: setAppUser }) => {
           {/* Desktop Navigation — centered */}
           <div className="hidden lg:flex items-center space-x-1 absolute left-1/2 -translate-x-1/2">
             {/* Home Link */}
-            <Link
-              to="/"
-              className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
-                isActive("/")
-                  ? "text-[#1eb5ee]"
-                  : "text-gray-700 hover:text-[#1eb5ee]"
-              }`}
-            >
+            {!restrictedSubdomain && (
+              <Link
+                to="/"
+                className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
+                  isActive("/")
+                    ? "text-[#1eb5ee]"
+                    : "text-gray-700 hover:text-[#1eb5ee]"
+                }`}
+              >
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -216,10 +232,11 @@ const Navbar = ({ setUser: setAppUser }) => {
                 />
               </svg>
               {t('navbar.home')}
-            </Link>
+              </Link>
+            )}
 
             {/* Chat Link - Only visible to logged in users - Navigates to chat page */}
-            {user && (
+            {showFullProductNav && (
               <Link
                 to="/chat"
                 onMouseEnter={() => import("./ChatWidget")}
@@ -246,7 +263,7 @@ const Navbar = ({ setUser: setAppUser }) => {
               </Link>
             )}
 
-            {user && (
+            {showComparisonNav && (
               <Link
                 to="/comparison"
                 onMouseEnter={() => import("./ComparisonAnalysis")}
@@ -274,7 +291,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Schedule Analysis Link - Only visible to logged in users */}
-            {user && (
+            {showFullProductNav && (
               <Link
                 to="/schedule-analysis"
                 onMouseEnter={() => import("./ScheduleAnalysis")}
@@ -302,7 +319,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Admin Portal Link - Only visible to admin users */}
-            {user && user.role === "admin" && (
+            {showFullProductNav && user.role === "admin" && (
               <Link
                 to="/admin"
                 className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
@@ -329,7 +346,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Company Portal Link - Visible to company owners and super admins */}
-            {user && (user.role === "company_owner" || user.role === "super_admin") && (
+            {showFullProductNav && (user.role === "company_owner" || user.role === "super_admin") && (
               <Link
                 to="/company-portal"
                 className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
@@ -356,7 +373,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Super Admin Portal Link - Only visible to super admins */}
-            {user && user.role === "super_admin" && (
+            {showFullProductNav && user.role === "super_admin" && (
               <Link
                 to="/super-admin"
                 className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
@@ -383,14 +400,15 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Support Link - At the end with headset icon */}
-            <Link
-              to="/support"
-              className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
-                isActive("/support")
-                  ? "text-[#1eb5ee]"
-                  : "text-gray-700 hover:text-[#1eb5ee]"
-              }`}
-            >
+            {showSupportNav && (
+              <Link
+                to="/support"
+                className={`px-3 py-2 text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
+                  isActive("/support")
+                    ? "text-[#1eb5ee]"
+                    : "text-gray-700 hover:text-[#1eb5ee]"
+                }`}
+              >
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -405,7 +423,8 @@ const Navbar = ({ setUser: setAppUser }) => {
                 />
               </svg>
               {t('navbar.support')}
-            </Link>
+              </Link>
+            )}
           </div>
 
           {/* Right side — language + auth */}
@@ -615,11 +634,12 @@ const Navbar = ({ setUser: setAppUser }) => {
             <div className="absolute top-0 left-0 right-0 bg-white shadow-xl max-h-[80vh] overflow-y-auto animate-slideDown">
               <div className="py-4 space-y-1 px-4">
             {/* Home Link - Mobile */}
-            <Link
-              to="/"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex items-center gap-2 px-6 py-3 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition-all duration-300"
-            >
+            {!restrictedSubdomain && (
+              <Link
+                to="/"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-6 py-3 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition-all duration-300"
+              >
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -634,10 +654,11 @@ const Navbar = ({ setUser: setAppUser }) => {
                 />
               </svg>
               {t('navbar.home')}
-            </Link>
+              </Link>
+            )}
 
             {/* Chat Link - Mobile - Only visible to logged in users - Navigates to chat page */}
-            {user && (
+            {showFullProductNav && (
               <Link
                 to="/chat"
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -661,7 +682,7 @@ const Navbar = ({ setUser: setAppUser }) => {
               </Link>
             )}
 
-            {user && (
+            {showComparisonNav && (
               <Link
                 to="/comparison"
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -686,7 +707,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Schedule Analysis Link - Mobile - Only visible to logged in users */}
-            {user && (
+            {showFullProductNav && (
               <Link
                 to="/schedule-analysis"
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -711,7 +732,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Admin Portal Link - Mobile - Only visible to admin users */}
-            {user && user.role === "admin" && (
+            {showFullProductNav && user.role === "admin" && (
               <Link
                 to="/admin"
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -735,7 +756,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Company Portal Link - Mobile - Visible to company owners and super admins */}
-            {user && (user.role === "company_owner" || user.role === "super_admin") && (
+            {showFullProductNav && (user.role === "company_owner" || user.role === "super_admin") && (
               <Link
                 to="/company-portal"
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -759,7 +780,7 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Super Admin Portal Link - Mobile - Only visible to super admins */}
-            {user && user.role === "super_admin" && (
+            {showFullProductNav && user.role === "super_admin" && (
               <Link
                 to="/super-admin"
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -783,11 +804,12 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
 
             {/* Support Link - Mobile - At the end with headset icon */}
-            <Link
-              to="/support"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex items-center gap-2 px-6 py-3 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition-all duration-300"
-            >
+            {showSupportNav && (
+              <Link
+                to="/support"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-6 py-3 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition-all duration-300"
+              >
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -802,7 +824,8 @@ const Navbar = ({ setUser: setAppUser }) => {
                 />
               </svg>
               {t('navbar.support')}
-            </Link>
+              </Link>
+            )}
 
             {/* Language Switcher - Mobile */}
             <div className="px-6 py-3">
