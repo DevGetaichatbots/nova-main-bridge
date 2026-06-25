@@ -21,6 +21,7 @@ app = Flask(__name__)
 ALLOWED_ORIGINS = [
     "https://green-beach-00b29e810.7.azurestaticapps.net",
     "https://nova-insights-frontend.azurewebsites.net",
+    "https://dashboard.novainsight.net",
     "https://www.novainsight.net",
     "https://novainsight.net",
     "http://localhost:5173",
