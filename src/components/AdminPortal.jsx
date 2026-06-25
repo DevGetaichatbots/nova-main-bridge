@@ -104,6 +104,7 @@ const AdminPortal = () => {
         setTimeout(() => navigate("/"), 2000);
       } else if (err.response?.status === 401) {
         localStorage.removeItem("user");
+        localStorage.removeItem("accessToken");
         navigate("/login");
       } else {
         setError(t('admin.couldNotFetch'));

@@ -114,6 +114,9 @@ const Login = ({ setUser }) => {
 
       if (data.success) {
         localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.access_token) {
+          localStorage.setItem('accessToken', data.access_token);
+        }
 
         // Update app state immediately
         if (setUser) {

@@ -106,6 +106,9 @@ const CompanySignup = ({ setUser }) => {
 
       if (data.success) {
         localStorage.setItem("user", JSON.stringify(data.user));
+        if (data.access_token) {
+          localStorage.setItem("accessToken", data.access_token);
+        }
 
         if (setUser) {
           setUser(data.user);

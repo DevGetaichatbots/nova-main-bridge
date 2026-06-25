@@ -1231,6 +1231,7 @@ function App() {
       } catch (error) {
         console.error("Error parsing user data:", error);
         localStorage.removeItem("user");
+        localStorage.removeItem("accessToken");
         setUser(null);
       }
     } else {
@@ -1458,6 +1459,7 @@ function App() {
           } catch (parseError) {
             console.error("Error parsing stored user data:", parseError);
             localStorage.removeItem("user");
+            localStorage.removeItem("accessToken");
             localStorage.removeItem("chatSessionId");
             setUser(null);
             setSessionId(null);

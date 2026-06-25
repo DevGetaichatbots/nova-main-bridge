@@ -1,8 +1,10 @@
 import { getApiBaseUrl } from './apiConfig';
 
 export const fetchWithAuth = async (url, options = {}) => {
+  const token = localStorage.getItem('accessToken');
   const headers = {
     "Content-Type": "application/json",
+    ...(token && { 'Authorization': `Bearer ${token}` }),
     ...options.headers,
   };
 
@@ -14,6 +16,7 @@ export const fetchWithAuth = async (url, options = {}) => {
 
   if (response.status === 401) {
     localStorage.removeItem("user");
+    localStorage.removeItem("accessToken");
     localStorage.setItem("auth_redirect_message", "session_expired");
     if (window.location.pathname !== '/login') {
       window.location.href = '/login';
@@ -63,8 +66,10 @@ export const deleteWithAuth = (endpoint, options = {}) => {
 
 export const uploadFilesWithAuth = async (endpoint, formData, options = {}) => {
   const url = endpoint.startsWith('http') ? endpoint : `${getApiBaseUrl()}${endpoint}`;
+  const token = localStorage.getItem('accessToken');
 
   const headers = {
+    ...(token && { 'Authorization': `Bearer ${token}` }),
     ...options.headers,
   };
 
@@ -78,6 +83,7 @@ export const uploadFilesWithAuth = async (endpoint, formData, options = {}) => {
 
   if (response.status === 401) {
     localStorage.removeItem("user");
+    localStorage.removeItem("accessToken");
     localStorage.setItem("auth_redirect_message", "session_expired");
     if (window.location.pathname !== '/login') {
       window.location.href = '/login';

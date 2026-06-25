@@ -164,7 +164,8 @@ def signup():
                         'email': new_user['email'],
                         'role': 'user',
                         'createdAt': new_user['created_at'].isoformat()
-                    }
+                    },
+                    'access_token': access_token
                 }
                 
                 resp = jsonify(response_data)
@@ -343,7 +344,8 @@ def login():
                 response_data = {
                     'success': True,
                     'message': 'Login vellykket',
-                    'user': user_response
+                    'user': user_response,
+                    'access_token': access_token
                 }
                 
                 resp = jsonify(response_data)

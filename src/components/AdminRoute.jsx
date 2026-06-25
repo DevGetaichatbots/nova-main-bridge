@@ -21,6 +21,7 @@ const AdminRoute = ({ children }) => {
   } catch (error) {
     console.error("Error parsing user data:", error);
     localStorage.removeItem("user");
+    localStorage.removeItem("accessToken");
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 };
