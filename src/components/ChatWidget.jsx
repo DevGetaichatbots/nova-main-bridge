@@ -3612,7 +3612,7 @@ const ChatWidget = ({
 
               {/* Input Area */}
           <div
-            className={`border-t border-[#1eb5ee]/30 ${isMinimized && !isMobile ? "p-3 rounded-b-2xl" : "px-6 py-6 rounded-none"}`}
+            className={`flex-shrink-0 border-t border-[#1eb5ee]/30 ${isMinimized && !isMobile ? "p-3 rounded-b-2xl" : "px-6 py-6 rounded-none"}`}
             style={{
               background:
                 "linear-gradient(145deg, rgba(0, 214, 214, 0.08) 0%, rgba(112, 211, 213, 0.05) 100%)",

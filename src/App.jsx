@@ -2348,9 +2348,9 @@ function App() {
             element={
               <RestrictedSubdomainRedirect path="/chat">
                 <ProtectedRoute>
-                  <div className="min-h-screen flex flex-col">
+                  <div className="h-screen flex flex-col overflow-hidden">
                     <Navbar user={user} setUser={setUser} />
-                    <div className="flex-1 min-h-0 pt-14">
+                    <div className="flex-1 min-h-0 pt-14 overflow-hidden">
                       <ChatWidget
                         key={chatWidgetKey}
                         sessionId={sessionId}
@@ -2390,9 +2390,9 @@ function App() {
             path="/comparison"
             element={
               <ProtectedRoute>
-                <div className="min-h-screen flex flex-col">
+                <div className="h-screen flex flex-col overflow-hidden">
                   <Navbar user={user} setUser={setUser} />
-                  <div className="flex-1 min-h-0 pt-14">
+                  <div className="flex-1 min-h-0 pt-14 overflow-hidden">
                     <ComparisonAnalysis user={user} />
                   </div>
                 </div>
