@@ -1150,7 +1150,7 @@ def export_dashboard_pdf():
             'https://api.pdfshift.io/v3/convert/pdf',
             auth=('api', 'sk_a13cf2657bdbb8bbe294bb232a5b323c38506904'),
             json={
-                'source': html,
+                'source': html.strip(),
                 'format': 'A4',
                 'margin': {'top': '8mm', 'bottom': '8mm', 'left': '8mm', 'right': '8mm'},
             },
