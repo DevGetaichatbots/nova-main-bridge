@@ -1129,3 +1129,44 @@ def generate_comparison(comparison_id):
                     conn.commit()
             finally:
                 conn.close()
+
+
+@schedule_bp.route('/export-pdf', methods=['POST'])
+def export_dashboard_pdf():
+    from flask import Response
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json(silent=True) or {}
+    html = data.get('html', '')
+    filename = data.get('filename', 'dashboard.pdf')
+
+    if not html:
+        return jsonify({'error': 'No HTML provided'}), 400
+
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page(viewport={'width': 1440, 'height': 900})
+            page.set_content(html, wait_until='networkidle')
+            pdf_bytes = page.pdf(
+                format='A4',
+                print_background=True,
+                scale=0.75,
+                margin={'top': '8mm', 'bottom': '8mm', 'left': '8mm', 'right': '8mm'},
+            )
+            browser.close()
+    except Exception as e:
+        print(f"[export-pdf] error: {e}")
+        return jsonify({'error': 'PDF generation failed'}), 500
+
+    safe_filename = sanitize_filename(
+        filename.replace('.xlsx','').replace('.mpp','').replace('.xml','').replace('.pdf','')
+    ) + '.pdf'
+    return Response(
+        pdf_bytes,
+        mimetype='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename="{safe_filename}"'},
+    )
