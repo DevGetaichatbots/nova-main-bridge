@@ -142,19 +142,4 @@ export const scheduleService = {
     return `sa_${hex}`;
   },
 
-  async exportDashboardPdf(html, filename) {
-    const response = await fetchWithAuth(`${API_BASE}/api/schedule/export-pdf`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html, filename }),
-    });
-    if (!response.ok) throw new Error('PDF export failed');
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  },
 };

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { chatService } from '../services/chatService';
 import { comparisonService } from '../services/comparisonService';
-import { scheduleService } from '../services/scheduleService';
+import { exportIframeToPdf } from '../utils/exportPdf';
 import { localizeComparisonDashboardHtml } from '../utils/reportLocalization';
 import ChatWidget from './ChatWidget';
 import FileComparisonModal from './FileComparisonModal';
@@ -324,9 +324,8 @@ const ComparisonAnalysis = ({ user }) => {
                   if (isExportingPdf) return;
                   setIsExportingPdf(true);
                   try {
-                    const html = localizeComparisonDashboardHtml(activeComparison.dashboard_html, i18n.language);
-                    await scheduleService.exportDashboardPdf(
-                      html,
+                    await exportIframeToPdf(
+                      iframeRef.current,
                       (activeComparison.title || 'health-dashboard') + '.pdf',
                     );
                   } catch (e) {
