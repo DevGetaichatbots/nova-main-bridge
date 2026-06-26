@@ -462,6 +462,7 @@ def upload_and_analyze(analysis_id):
 
     language = request.form.get('language', 'en')
     fmt = request.form.get('format', 'html')
+    data_format = request.form.get('data_format', 'raw')
 
     file_data = schedule_file.read()
     file_size = len(file_data)
@@ -512,14 +513,14 @@ def upload_and_analyze(analysis_id):
         else:
             mime_type = 'application/pdf'
         resp = http_requests.post(
-            f"{AGENT_BASE_URL}/predictive",
+            f"{AGENT_BASE_URL}/predictive/dashboard",
             files={'schedule': (filename, file_data, mime_type)},
-            data={'language': language, 'format': fmt, 'analysis_id': analysis_id},
+            data={'language': language, 'format': fmt, 'analysis_id': analysis_id, 'data_format': data_format},
             timeout=550,
             verify=False,
         )
 
-        print(f"✅ Azure predictive agent responded: {resp.status_code}")
+        print(f"✅ Azure predictive dashboard agent responded: {resp.status_code}")
 
         conn2 = get_db_connection()
         if not conn2:
@@ -529,7 +530,7 @@ def upload_and_analyze(analysis_id):
             if resp.status_code == 200:
                 result = resp.json()
                 predictive_insights = localize_predictive_report_html(
-                    result.get('predictive_insights', ''),
+                    result.get('response', ''),
                     language,
                 )
                 processing_time = result.get('processing_time_seconds')
@@ -623,6 +624,7 @@ def v2_upload_and_analyze(analysis_id):
 
     language = request.form.get('language', 'en')
     fmt = request.form.get('format', 'html')
+    data_format = request.form.get('data_format', 'nusf')
     filename = schedule_file.filename
     file_data = schedule_file.read()
     file_size = len(file_data)
@@ -673,7 +675,7 @@ def v2_upload_and_analyze(analysis_id):
         resp = http_requests.post(
             f"{AGENT_BASE_URL}/v2/predictive",
             files={'schedule': (filename, file_data, mime_type)},
-            data={'language': language, 'format': fmt, 'analysis_id': analysis_id},
+            data={'language': language, 'format': fmt, 'analysis_id': analysis_id, 'data_format': data_format},
             timeout=60,
             verify=False,
         )

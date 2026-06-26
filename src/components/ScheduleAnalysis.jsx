@@ -45,7 +45,6 @@ const ScheduleAnalysis = ({ user }) => {
   const [pendingFile, setPendingFile] = useState(null);
   const fileInputRef = useRef(null);
   const progressPollRef = useRef(null);
-  const isV2RunningRef = useRef(false);
   const reportContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const observerRef = useRef(null);
@@ -113,7 +112,6 @@ const ScheduleAnalysis = ({ user }) => {
     }
 
     const pollProgress = async () => {
-      if (isV2RunningRef.current) return;
       try {
         const data = await scheduleService.getProgress(activeAnalysisId);
         if (data && data.stage && data.stage !== 'unknown' && data.step > 0) {
@@ -343,97 +341,36 @@ const ScheduleAnalysis = ({ user }) => {
 
     try {
       const lang = i18n.language?.substring(0, 2) || 'en';
+      const dataFormat = useNusf ? 'nusf' : 'raw';
 
-      if (useNusf) {
-        isV2RunningRef.current = true;
-        await scheduleService.uploadAndAnalyzeV2(activeAnalysisId, file, lang);
+      const data = await scheduleService.uploadAndAnalyze(activeAnalysisId, file, lang, dataFormat);
 
-        await new Promise((resolve, reject) => {
-          let attempts = 0;
-          const maxAttempts = 200;
-          let timerId;
-
-          const poll = async () => {
-            try {
-              const progress = await scheduleService.pollV2Progress(activeAnalysisId);
-              if (progress.stage && progress.stage !== 'unknown' && progress.step > 0) {
-                setProgressData(progress);
-              }
-              if (progress.stage === 'complete') {
-                clearTimeout(timerId);
-                resolve();
-                return;
-              }
-              if (progress.stage === 'error') {
-                clearTimeout(timerId);
-                reject(new Error(progress.message || t('scheduleAnalysis.errors.failed')));
-                return;
-              }
-            } catch (_e) {}
-            attempts++;
-            if (attempts < maxAttempts) {
-              timerId = setTimeout(poll, 2500);
-            } else {
-              reject(new Error('Analysis timed out. Please try again.'));
-            }
+      if (data.success) {
+        setProgressData({ stage: 'complete', message: t('scheduleAnalysis.progress.complete'), step: 6, total_steps: 6 });
+        await new Promise(r => setTimeout(r, 800));
+        setActiveAnalysis(prev => {
+          const updated = {
+            ...prev,
+            status: 'completed',
+            filename: file.name,
+            predictive_insights: data.predictive_insights,
+            processing_time: data.processing_time_seconds,
+            model: data.predictive_model,
+            reference_date: data.reference_date,
           };
-
-          timerId = setTimeout(poll, 2500);
+          analysisCacheRef.current[activeAnalysisId] = updated;
+          return updated;
         });
-
-        const fetchedData = await scheduleService.getAnalysis(activeAnalysisId);
-        if (fetchedData.success && fetchedData.analysis?.predictive_insights) {
-          setProgressData({ stage: 'complete', message: t('scheduleAnalysis.progress.complete'), step: 6, total_steps: 6 });
-          await new Promise(r => setTimeout(r, 800));
-          setActiveAnalysis(prev => {
-            const updated = {
-              ...prev,
-              status: 'completed',
-              filename: fetchedData.analysis.filename || file.name,
-              predictive_insights: fetchedData.analysis.predictive_insights,
-              processing_time: fetchedData.analysis.processing_time,
-              model: fetchedData.analysis.model,
-              reference_date: fetchedData.analysis.reference_date,
-            };
-            analysisCacheRef.current[activeAnalysisId] = updated;
-            return updated;
-          });
-          await loadAnalyses();
-        } else {
-          throw new Error(fetchedData.error || t('scheduleAnalysis.errors.failed'));
-        }
-
+        await loadAnalyses();
       } else {
-        const data = await scheduleService.uploadAndAnalyze(activeAnalysisId, file, lang);
-
-        if (data.success) {
-          setProgressData({ stage: 'complete', message: t('scheduleAnalysis.progress.complete'), step: 6, total_steps: 6 });
-          await new Promise(r => setTimeout(r, 800));
-          setActiveAnalysis(prev => {
-            const updated = {
-              ...prev,
-              status: 'completed',
-              filename: file.name,
-              predictive_insights: data.predictive_insights,
-              processing_time: data.processing_time_seconds,
-              model: data.predictive_model,
-              reference_date: data.reference_date,
-            };
-            analysisCacheRef.current[activeAnalysisId] = updated;
-            return updated;
-          });
-          await loadAnalyses();
-        } else {
-          setError(data.error || t('scheduleAnalysis.errors.failed'));
-          setActiveAnalysis(prev => ({ ...prev, status: 'error' }));
-        }
+        setError(data.error || t('scheduleAnalysis.errors.failed'));
+        setActiveAnalysis(prev => ({ ...prev, status: 'error' }));
       }
     } catch (err) {
       console.error('Upload/analyze error:', err);
       setError(err.message || t('scheduleAnalysis.errors.failed'));
       setActiveAnalysis(prev => prev ? { ...prev, status: 'error' } : prev);
     } finally {
-      isV2RunningRef.current = false;
       setIsProcessing(false);
       setProgressData({ stage: '', message: '', step: 0, total_steps: 6 });
     }
@@ -709,68 +646,93 @@ const ScheduleAnalysis = ({ user }) => {
     }
   };
 
-  // Memoized DOMPurify sanitization — recomputes only when the raw HTML changes
+  const isDashboardHtml = useCallback((html) => {
+    return typeof html === 'string' && html.includes('window.__pdData');
+  }, []);
+
+  // Memoized DOMPurify sanitization — only for legacy (non-dashboard) report HTML
   const sanitized = useMemo(() => {
-    if (!activeAnalysis?.predictive_insights) return '';
-    return DOMPurify.sanitize(localizePredictiveReportHtml(activeAnalysis.predictive_insights, i18n.language), {
+    const html = activeAnalysis?.predictive_insights;
+    if (!html || isDashboardHtml(html)) return '';
+    return DOMPurify.sanitize(localizePredictiveReportHtml(html, i18n.language), {
       ADD_TAGS: ['style'],
       ADD_ATTR: ['style', 'class'],
       FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
       FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover'],
     });
-  }, [activeAnalysis?.predictive_insights, i18n.language]);
+  }, [activeAnalysis?.predictive_insights, i18n.language, isDashboardHtml]);
 
   const renderReport = () => {
     if (!activeAnalysis?.predictive_insights) return null;
 
-    return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-shrink-0 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1eb5ee] to-[#00B4B4] flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">{activeAnalysis.filename}</h3>
-              <p className="text-xs text-slate-500">
-                {activeAnalysis.reference_date && `${t('scheduleAnalysis.report.refDate')}: ${activeAnalysis.reference_date}`}
-                {activeAnalysis.processing_time && ` · ${activeAnalysis.processing_time.toFixed(1)}s`}
-              </p>
-            </div>
+    const isDash = isDashboardHtml(activeAnalysis.predictive_insights);
+
+    const topBar = (
+      <div className="flex-shrink-0 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1eb5ee] to-[#00B4B4] flex items-center justify-center">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleDownloadPdf}
-              disabled={isDownloadingPdf}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all disabled:opacity-50"
-            >
-              {isDownloadingPdf ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              )}
-              {t('scheduleAnalysis.report.downloadPdf')}
-            </button>
-            <button
-              onClick={() => {
-                setActiveAnalysis(prev => ({ ...prev, predictive_insights: null, status: 'pending', filename: null }));
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#1eb5ee] to-[#00B4B4] text-white text-sm font-medium hover:shadow-lg transition-all"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              {t('scheduleAnalysis.report.newUpload')}
-            </button>
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">{activeAnalysis.filename}</h3>
+            <p className="text-xs text-slate-500">
+              {activeAnalysis.reference_date && `${t('scheduleAnalysis.report.refDate')}: ${activeAnalysis.reference_date}`}
+              {activeAnalysis.processing_time && ` · ${activeAnalysis.processing_time.toFixed(1)}s`}
+            </p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadPdf}
+            disabled={isDownloadingPdf}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all disabled:opacity-50"
+          >
+            {isDownloadingPdf ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
+            {t('scheduleAnalysis.report.downloadPdf')}
+          </button>
+          <button
+            onClick={() => {
+              setActiveAnalysis(prev => ({ ...prev, predictive_insights: null, status: 'pending', filename: null }));
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#1eb5ee] to-[#00B4B4] text-white text-sm font-medium hover:shadow-lg transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            {t('scheduleAnalysis.report.newUpload')}
+          </button>
+        </div>
+      </div>
+    );
+
+    if (isDash) {
+      return (
+        <div className="flex-1 flex flex-col min-h-0">
+          {topBar}
+          <iframe
+            srcDoc={activeAnalysis.predictive_insights}
+            title="Risk Dashboard"
+            sandbox="allow-scripts allow-same-origin"
+            style={{ flex: 1, border: 'none', width: '100%', minHeight: 0 }}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        {topBar}
         {navSections.length > 0 && (
           <div className="flex-shrink-0 z-10 bg-white/98 backdrop-blur-sm border-b border-slate-200 shadow-sm px-4 py-2">
             <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>

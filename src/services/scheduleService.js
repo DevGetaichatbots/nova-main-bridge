@@ -42,11 +42,12 @@ export const scheduleService = {
     return response.json();
   },
 
-  async uploadAndAnalyze(analysisId, file, language = 'en') {
+  async uploadAndAnalyze(analysisId, file, language = 'en', dataFormat = 'raw') {
     const formData = new FormData();
     formData.append('schedule', file);
     formData.append('language', language);
     formData.append('format', 'html');
+    formData.append('data_format', dataFormat);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 600000);
@@ -105,11 +106,12 @@ export const scheduleService = {
     a.remove();
   },
 
-  async uploadAndAnalyzeV2(analysisId, file, language = 'en') {
+  async uploadAndAnalyzeV2(analysisId, file, language = 'en', dataFormat = 'nusf') {
     const formData = new FormData();
     formData.append('schedule', file);
     formData.append('language', language);
     formData.append('format', 'html');
+    formData.append('data_format', dataFormat);
 
     const response = await uploadFilesWithAuth(
       `${API_BASE}/api/schedule/analyses/${analysisId}/v2/upload`,
