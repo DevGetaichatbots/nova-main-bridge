@@ -207,7 +207,7 @@ const ComparisonAnalysis = ({ user }) => {
     <iframe
       ref={iframeRef}
       srcDoc={localizeComparisonDashboardHtml(activeComparison.dashboard_html, i18n.language)}
-      sandbox="allow-scripts"
+      sandbox="allow-scripts allow-modals"
       style={{ width: '100%', minHeight: '100vh', border: 'none', display: 'block' }}
       onLoad={handleIframeLoad}
       title={i18n.language?.startsWith('da') ? 'Projektsundhed Dashboard' : 'Project Health Dashboard'}

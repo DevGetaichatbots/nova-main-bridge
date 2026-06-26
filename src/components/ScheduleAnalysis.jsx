@@ -701,7 +701,7 @@ const ScheduleAnalysis = ({ user }) => {
             ref={dashboardIframeRef}
             srcDoc={activeAnalysis.predictive_insights}
             title="Risk Dashboard"
-            sandbox="allow-scripts allow-same-origin"
+            sandbox="allow-scripts allow-same-origin allow-modals"
             style={{ flex: 1, border: 'none', width: '100%', minHeight: 0 }}
           />
         </div>
