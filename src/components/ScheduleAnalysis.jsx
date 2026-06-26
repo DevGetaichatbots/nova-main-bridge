@@ -29,7 +29,6 @@ const ScheduleAnalysis = ({ user }) => {
   const [analyses, setAnalyses] = useState([]);
   const [activeAnalysisId, setActiveAnalysisId] = useState(null);
   const [activeAnalysis, setActiveAnalysis] = useState(null);
-  const [isFreshUpload, setIsFreshUpload] = useState(false);
   const [isLoadingList, setIsLoadingList] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressData, setProgressData] = useState({ stage: '', message: '', step: 0, total_steps: 6 });
@@ -72,7 +71,6 @@ const ScheduleAnalysis = ({ user }) => {
   useEffect(() => {
     setPendingFile(null);
     setUseNusf(false);
-    setIsFreshUpload(false);
     if (!activeAnalysisId) {
       setActiveAnalysis(null);
       setIsLoadingAnalysis(false);
@@ -363,7 +361,6 @@ const ScheduleAnalysis = ({ user }) => {
           analysisCacheRef.current[activeAnalysisId] = updated;
           return updated;
         });
-        setIsFreshUpload(true);
         await loadAnalyses();
       } else {
         setError(data.error || t('scheduleAnalysis.errors.failed'));
@@ -686,38 +683,6 @@ const ScheduleAnalysis = ({ user }) => {
             </p>
           </div>
         </div>
-        {isFreshUpload && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleDownloadPdf}
-              disabled={isDownloadingPdf}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all disabled:opacity-50"
-            >
-              {isDownloadingPdf ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              )}
-              {t('scheduleAnalysis.report.downloadPdf')}
-            </button>
-            <button
-              onClick={() => {
-                setActiveAnalysis(prev => ({ ...prev, predictive_insights: null, status: 'pending', filename: null }));
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#1eb5ee] to-[#00B4B4] text-white text-sm font-medium hover:shadow-lg transition-all"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              {t('scheduleAnalysis.report.newUpload')}
-            </button>
-          </div>
-        )}
       </div>
     );
 
