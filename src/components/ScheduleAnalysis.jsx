@@ -665,7 +665,11 @@ const ScheduleAnalysis = ({ user }) => {
     const isDash = isDashboardHtml(activeAnalysis.predictive_insights);
 
     const topBar = (
-      <div className="flex-shrink-0 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+      <div
+        className={`flex-shrink-0 bg-white/95 backdrop-blur-sm border-b border-slate-200 py-3 flex items-center justify-between ${
+          sidebarOpen ? 'px-6' : 'pl-20 pr-6'
+        }`}
+      >
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1eb5ee] to-[#00B4B4] flex items-center justify-center">
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

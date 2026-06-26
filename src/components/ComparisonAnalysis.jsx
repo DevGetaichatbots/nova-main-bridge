@@ -309,7 +309,11 @@ const ComparisonAnalysis = ({ user }) => {
 
     return (
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-shrink-0 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+        <div
+          className={`flex-shrink-0 bg-white/95 backdrop-blur-sm border-b border-slate-200 py-3 flex items-center justify-between ${
+            sidebarOpen ? 'px-6' : 'pl-20 pr-6'
+          }`}
+        >
           <div>
             <h3 className="text-sm font-bold text-slate-800">{activeComparison.title}</h3>
             <p className="text-xs text-slate-500">
