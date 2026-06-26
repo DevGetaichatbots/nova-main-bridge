@@ -659,6 +659,35 @@ const ScheduleAnalysis = ({ user }) => {
     });
   }, [activeAnalysis?.predictive_insights, i18n.language, isDashboardHtml]);
 
+  const wrappedDashboardHtml = useMemo(() => {
+    const html = activeAnalysis?.predictive_insights;
+    if (!html || !isDashboardHtml(html)) return '';
+    const trimmed = html.trim();
+    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) return trimmed;
+    return `<!DOCTYPE html><html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  html, body { margin: 0; padding: 0; overflow-x: hidden; min-height: 100%; }
+  * { box-sizing: border-box; }
+  .v5-page-body { flex-wrap: wrap; }
+  .v5-main { min-width: 0; }
+  .v5-scroll-wrap { max-height: none; overflow-y: visible; }
+  @media (max-width: 900px) {
+    .v5-sidebar {
+      width: 100% !important;
+      min-width: 0 !important;
+      border-right: none !important;
+      border-bottom: 1px solid #e2e8f0;
+      position: static !important;
+    }
+    .v5-filter-opts { flex-direction: row; flex-wrap: wrap; }
+    .v5-kpi-pill { min-width: 80px !important; }
+  }
+</style>
+</head><body>${trimmed}</body></html>`;
+  }, [activeAnalysis?.predictive_insights, isDashboardHtml]);
+
   const renderReport = () => {
     if (!activeAnalysis?.predictive_insights) return null;
 
@@ -687,7 +716,7 @@ const ScheduleAnalysis = ({ user }) => {
               setIsExportingPdf(true);
               try {
                 await scheduleService.exportDashboardPdf(
-                  activeAnalysis.predictive_insights,
+                  wrappedDashboardHtml,
                   (activeAnalysis.filename || 'dashboard').replace(/\.[^.]+$/, '') + '.pdf',
                 );
               } catch (e) {
@@ -721,7 +750,7 @@ const ScheduleAnalysis = ({ user }) => {
           {topBar}
           <iframe
             ref={dashboardIframeRef}
-            srcDoc={activeAnalysis.predictive_insights}
+            srcDoc={wrappedDashboardHtml}
             title="Risk Dashboard"
             sandbox="allow-scripts allow-same-origin"
             style={{ flex: 1, border: 'none', width: '100%', minHeight: 0 }}
