@@ -1145,15 +1145,12 @@ def export_dashboard_pdf():
     if not html:
         return jsonify({'error': 'No HTML provided'}), 400
 
-    html_to_send = html.strip()
-    if not (html_to_send.startswith('<!DOCTYPE') or html_to_send.startswith('<html') or html_to_send.startswith('http')):
-        html_to_send = f'<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>{html_to_send}</body></html>'
     try:
         resp = http_requests.post(
             'https://api.pdfshift.io/v3/convert/pdf',
             auth=('api', 'sk_a13cf2657bdbb8bbe294bb232a5b323c38506904'),
             json={
-                'source': html_to_send,
+                'source': html.strip(),
                 'format': 'A4',
                 'margin': {'top': '8mm', 'bottom': '8mm', 'left': '8mm', 'right': '8mm'},
             },
