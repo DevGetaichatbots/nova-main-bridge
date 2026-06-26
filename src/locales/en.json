@@ -1111,7 +1111,8 @@
     "report": {
       "refDate": "Reference date",
       "newUpload": "New Upload",
-      "downloadPdf": "Download PDF"
+      "downloadPdf": "Download PDF",
+      "exportPdf": "Export PDF"
     },
     "errors": {
       "pdfOnly": "Only PDF, CSV, XLSX, MPP and XML files are supported. Please select a valid file.",

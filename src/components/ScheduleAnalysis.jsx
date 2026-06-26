@@ -45,6 +45,7 @@ const ScheduleAnalysis = ({ user }) => {
   const [pendingFile, setPendingFile] = useState(null);
   const fileInputRef = useRef(null);
   const progressPollRef = useRef(null);
+  const dashboardIframeRef = useRef(null);
   const reportContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const observerRef = useRef(null);
@@ -683,6 +684,17 @@ const ScheduleAnalysis = ({ user }) => {
             </p>
           </div>
         </div>
+        {isDash && (
+          <button
+            onClick={() => dashboardIframeRef.current?.contentWindow?.print()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            {t('scheduleAnalysis.report.exportPdf')}
+          </button>
+        )}
       </div>
     );
 
@@ -691,6 +703,7 @@ const ScheduleAnalysis = ({ user }) => {
         <div className="flex-1 flex flex-col min-h-0">
           {topBar}
           <iframe
+            ref={dashboardIframeRef}
             srcDoc={activeAnalysis.predictive_insights}
             title="Risk Dashboard"
             sandbox="allow-scripts allow-same-origin"

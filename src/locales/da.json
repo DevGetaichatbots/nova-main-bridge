@@ -1113,7 +1113,8 @@
     "report": {
       "refDate": "Referencedato",
       "newUpload": "Ny Upload",
-      "downloadPdf": "Download PDF"
+      "downloadPdf": "Download PDF",
+      "exportPdf": "Eksporter PDF"
     },
     "errors": {
       "pdfOnly": "Kun PDF-, CSV-, XLSX-, MPP- og XML-filer understøttes. Vælg venligst en gyldig fil.",
