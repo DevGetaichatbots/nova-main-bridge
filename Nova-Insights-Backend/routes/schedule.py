@@ -1146,20 +1146,21 @@ def export_dashboard_pdf():
         return jsonify({'error': 'No HTML provided'}), 400
 
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch()
-            page = browser.new_page(viewport={'width': 1440, 'height': 900})
-            page.set_content(html, wait_until='networkidle')
-            pdf_bytes = page.pdf(
-                format='A4',
-                print_background=True,
-                scale=0.75,
-                margin={'top': '8mm', 'bottom': '8mm', 'left': '8mm', 'right': '8mm'},
-            )
-            browser.close()
+        resp = http_requests.post(
+            'https://api.pdfshift.io/v3/convert/pdf',
+            auth=('api', 'sk_a13cf2657bdbb8bbe294bb232a5b323c38506904'),
+            json={
+                'source': html,
+                'format': 'A4',
+                'print_background': True,
+                'margin': {'top': '8mm', 'bottom': '8mm', 'left': '8mm', 'right': '8mm'},
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        pdf_bytes = resp.content
     except Exception as e:
-        print(f"[export-pdf] error: {e}")
+        print(f"[export-pdf] PDFShift error: {e}")
         return jsonify({'error': 'PDF generation failed'}), 500
 
     safe_filename = sanitize_filename(
