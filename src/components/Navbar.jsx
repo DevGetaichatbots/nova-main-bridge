@@ -184,6 +184,7 @@ const Navbar = ({ setUser: setAppUser }) => {
     : "/";
   const showComparisonNav = restrictedSubdomain ? hasAuthenticatedUser : Boolean(user);
   const showSupportNav = restrictedSubdomain ? hasAuthenticatedUser : true;
+  const showScheduleNav = hasAuthenticatedUser;
   const showFullProductNav = hasAuthenticatedUser && !restrictedSubdomain;
 
   const isActive = (path) => location.pathname === path;
@@ -294,8 +295,8 @@ const Navbar = ({ setUser: setAppUser }) => {
               </Link>
             )}
 
-            {/* Schedule Analysis Link - Only visible to logged in users */}
-            {showFullProductNav && (
+            {/* Predictive Dashboard Link - visible to all logged in users incl. restricted subdomain */}
+            {showScheduleNav && (
               <Link
                 to="/schedule-analysis"
                 onMouseEnter={() => import("./ScheduleAnalysis")}
@@ -710,8 +711,8 @@ const Navbar = ({ setUser: setAppUser }) => {
               </Link>
             )}
 
-            {/* Schedule Analysis Link - Mobile - Only visible to logged in users */}
-            {showFullProductNav && (
+            {/* Predictive Dashboard Link - Mobile - visible to all logged in users incl. restricted subdomain */}
+            {showScheduleNav && (
               <Link
                 to="/schedule-analysis"
                 onClick={() => setIsMobileMenuOpen(false)}

@@ -5,6 +5,7 @@ const RESTRICTED_SUBDOMAIN_ALLOWED_PATHS = new Set([
   "/forgot-password",
   "/login",
   "/reset-password",
+  "/schedule-analysis",
   "/signup",
   "/support",
   "/verify-otp",
