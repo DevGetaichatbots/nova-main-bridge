@@ -1152,16 +1152,18 @@ def export_dashboard_pdf():
             json={
                 'source': html,
                 'format': 'A4',
-                'print_background': True,
                 'margin': {'top': '8mm', 'bottom': '8mm', 'left': '8mm', 'right': '8mm'},
             },
             timeout=60,
         )
-        resp.raise_for_status()
+        print(f"[export-pdf] PDFShift status: {resp.status_code}")
+        if resp.status_code != 200:
+            print(f"[export-pdf] PDFShift response: {resp.text[:500]}")
+            return jsonify({'error': f'PDFShift error {resp.status_code}: {resp.text[:200]}'}), 500
         pdf_bytes = resp.content
     except Exception as e:
         print(f"[export-pdf] PDFShift error: {e}")
-        return jsonify({'error': 'PDF generation failed'}), 500
+        return jsonify({'error': str(e)}), 500
 
     safe_filename = sanitize_filename(
         filename.replace('.xlsx','').replace('.mpp','').replace('.xml','').replace('.pdf','')

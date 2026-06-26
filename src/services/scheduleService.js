@@ -148,7 +148,10 @@ export const scheduleService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ html, filename }),
     });
-    if (!response.ok) throw new Error('PDF export failed');
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `PDF export failed (${response.status})`);
+    }
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
