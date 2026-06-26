@@ -5,7 +5,6 @@ import { scheduleService } from '../services/scheduleService';
 import { localizePredictiveReportHtml } from '../utils/reportLocalization';
 import AnalysisPageShell from './AnalysisPageShell';
 import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
-import NusfToggle from './NusfToggle';
 
 const SCHEDULE_NAV_SECTIONS = [
   { id: 'predictive-schedule-outlook',      labelEn: 'Schedule Outlook',       labelDa: 'Tidsplan Udsigt' },
@@ -41,7 +40,6 @@ const ScheduleAnalysis = ({ user }) => {
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [navSections, setNavSections] = useState([]);
   const [activeSectionId, setActiveSectionId] = useState(null);
-  const [useNusf, setUseNusf] = useState(false);
   const [pendingFile, setPendingFile] = useState(null);
   const fileInputRef = useRef(null);
   const progressPollRef = useRef(null);
@@ -71,7 +69,6 @@ const ScheduleAnalysis = ({ user }) => {
 
   useEffect(() => {
     setPendingFile(null);
-    setUseNusf(false);
     if (!activeAnalysisId) {
       setActiveAnalysis(null);
       setIsLoadingAnalysis(false);
@@ -342,7 +339,7 @@ const ScheduleAnalysis = ({ user }) => {
 
     try {
       const lang = i18n.language?.substring(0, 2) || 'en';
-      const dataFormat = useNusf ? 'nusf' : 'raw';
+      const dataFormat = 'nusf';
 
       const data = await scheduleService.uploadAndAnalyze(activeAnalysisId, file, lang, dataFormat);
 
@@ -478,7 +475,7 @@ const ScheduleAnalysis = ({ user }) => {
                 <p className="text-xs text-slate-500">{(pendingFile.size / 1024).toFixed(1)} KB</p>
               </div>
               <button
-                onClick={() => { setPendingFile(null); setUseNusf(false); }}
+                onClick={() => { setPendingFile(null); }}
                 className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -486,8 +483,6 @@ const ScheduleAnalysis = ({ user }) => {
                 </svg>
               </button>
             </div>
-
-            <NusfToggle enabled={useNusf} onChange={setUseNusf} />
 
             <button
               onClick={handleStartAnalysis}
