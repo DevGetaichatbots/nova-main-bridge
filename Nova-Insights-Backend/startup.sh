@@ -6,4 +6,6 @@ apt-get install -y --no-install-recommends \
     libgdk-pixbuf2.0-0 \
     libffi8
 
+playwright install --with-deps chromium
+
 gunicorn --bind=0.0.0.0 --timeout 600 app:app

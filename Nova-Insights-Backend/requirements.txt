@@ -11,3 +11,4 @@ gunicorn==21.2.0
 reportlab==4.0.8
 beautifulsoup4==4.12.2
 weasyprint>=60.0
+playwright>=1.40.0
