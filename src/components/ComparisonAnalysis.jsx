@@ -4,7 +4,7 @@ import { chatService } from '../services/chatService';
 import { comparisonService } from '../services/comparisonService';
 import { localizeComparisonDashboardHtml } from '../utils/reportLocalization';
 import { exportHtmlToPdf } from '../utils/exportPdf';
-import ChatWidget from './ChatWidget';
+import { buildDashboardShareUrl, copyTextToClipboard } from '../utils/shareLinks';
 import FileComparisonModal from './FileComparisonModal';
 import AnalysisPageShell from './AnalysisPageShell';
 import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
@@ -29,9 +29,9 @@ const ComparisonAnalysis = ({ user }) => {
   const [error, setError] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadSessionId, setUploadSessionId] = useState(null);
-  const [useClassic, setUseClassic] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState('');
   const iframeRef = useRef(null);
 
   const loadComparisons = useCallback(async () => {
@@ -51,7 +51,6 @@ const ComparisonAnalysis = ({ user }) => {
   }, [loadComparisons]);
 
   useEffect(() => {
-    setUseClassic(false);
     if (!activeComparisonId) {
       setActiveComparison(null);
       return;
@@ -189,6 +188,19 @@ const ComparisonAnalysis = ({ user }) => {
     }
   };
 
+  const handleShareComparison = async (comparisonId = activeComparisonId) => {
+    if (!comparisonId) return;
+    try {
+      const shareUrl = buildDashboardShareUrl('comparison', comparisonId, i18n.language);
+      await copyTextToClipboard(shareUrl);
+      setShareFeedback(i18n.language?.startsWith('da') ? 'Link kopieret' : 'Link copied');
+      setTimeout(() => setShareFeedback(''), 2400);
+    } catch (err) {
+      console.error('Share link copy failed:', err);
+      setError(i18n.language?.startsWith('da') ? 'Kunne ikke kopiere linket.' : 'Could not copy the share link.');
+    }
+  };
+
   const renderDashboard = () => (
     <iframe
       ref={iframeRef}
@@ -288,8 +300,6 @@ const ComparisonAnalysis = ({ user }) => {
 
   const renderReport = () => {
     if (!activeComparison?.dashboard_html) return renderUpload();
-    const oldSessionId = activeComparison.old_session_id;
-    const newSessionId = activeComparison.new_session_id;
 
     return (
       <div className="flex-1 flex flex-col min-h-0">
@@ -306,69 +316,57 @@ const ComparisonAnalysis = ({ user }) => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {!useClassic && (
-              <button
-                onClick={async () => {
-                  if (isExportingPdf) return;
-                  setIsExportingPdf(true);
-                  setError(null);
-                  try {
-                    const html = localizeComparisonDashboardHtml(activeComparison.dashboard_html, i18n.language);
-                    await exportHtmlToPdf(
-                      html,
-                      (activeComparison.title || 'health-dashboard') + '.pdf',
-                    );
-                  } catch (e) {
-                    console.error('PDF export error:', e);
-                    setError(i18n.language?.startsWith('da')
-                      ? 'Kunne ikke eksportere PDF. Prøv venligst igen.'
-                      : 'Failed to export PDF. Please try again.');
-                  } finally {
-                    setIsExportingPdf(false);
-                  }
-                }}
-                disabled={isExportingPdf}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all disabled:opacity-50"
-              >
-                {isExportingPdf ? (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                )}
-                {i18n.language?.startsWith('da') ? 'Eksporter PDF' : 'Export PDF'}
-              </button>
-            )}
+            {shareFeedback && <span className="text-xs font-semibold text-[#00B4B4]">{shareFeedback}</span>}
             <button
-              onClick={() => setUseClassic(v => !v)}
-              className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all"
+              onClick={() => handleShareComparison(activeComparisonId)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all"
             >
-              {useClassic
-                ? (i18n.language?.startsWith('da') ? 'Vis Dashboard' : 'Show Dashboard')
-                : (i18n.language?.startsWith('da') ? 'Brug Klassisk Analyse' : 'Use Classic Analysis')}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.59 13.51a3 3 0 010-4.24l2.12-2.12a3 3 0 014.24 4.24l-.35.35m-1.18-1.18a3 3 0 010 4.24l-2.12 2.12a3 3 0 01-4.24-4.24l.35-.35" />
+              </svg>
+              {i18n.language?.startsWith('da') ? 'Del link' : 'Share link'}
+            </button>
+            <button
+              onClick={async () => {
+                if (isExportingPdf) return;
+                setIsExportingPdf(true);
+                setError(null);
+                try {
+                  const html = localizeComparisonDashboardHtml(activeComparison.dashboard_html, i18n.language);
+                  await exportHtmlToPdf(
+                    html,
+                    (activeComparison.title || 'health-dashboard') + '.pdf',
+                  );
+                } catch (e) {
+                  console.error('PDF export error:', e);
+                  setError(i18n.language?.startsWith('da')
+                    ? 'Kunne ikke eksportere PDF. Prøv venligst igen.'
+                    : 'Failed to export PDF. Please try again.');
+                } finally {
+                  setIsExportingPdf(false);
+                }
+              }}
+              disabled={isExportingPdf}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all disabled:opacity-50"
+            >
+              {isExportingPdf ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )}
+              {i18n.language?.startsWith('da') ? 'Eksporter PDF' : 'Export PDF'}
             </button>
           </div>
         </div>
         <div className="flex-1 min-h-0 bg-slate-50 overflow-hidden">
-          {useClassic ? (
-            <ChatWidget
-              sessionId={activeComparison.session_id}
-              oldSessionId={oldSessionId}
-              newSessionId={newSessionId}
-              user={user}
-              tableSessionIds={{ oldSessionId, newSessionId }}
-              shouldAutoOpen={true}
-              isFullPage={true}
-            />
-          ) : (
-            <div className="h-full overflow-y-auto">
-              {renderDashboard()}
-            </div>
-          )}
+          <div className="h-full overflow-y-auto">
+            {renderDashboard()}
+          </div>
         </div>
       </div>
     );
@@ -404,6 +402,7 @@ const ComparisonAnalysis = ({ user }) => {
           onNewAnalysis={handleNewComparison}
           onDeleteAnalysis={handleDeleteComparison}
           onRenameAnalysis={handleRenameComparison}
+          onShareAnalysis={handleShareComparison}
           isLoadingList={isLoadingList}
           isCreating={isCreating}
           isOpen={sidebarOpen}

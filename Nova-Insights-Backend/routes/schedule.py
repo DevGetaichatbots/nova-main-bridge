@@ -46,6 +46,18 @@ def _localize_comparison_payload(comparison, language=None):
         )
     return comparison
 
+
+def _isoformat_dates(row, *fields):
+    for field in fields:
+        if row.get(field) and hasattr(row[field], 'isoformat'):
+            row[field] = row[field].isoformat()
+    return row
+
+
+def _public_share_url(kind, item_id):
+    frontend_url = request.headers.get('Origin') or request.host_url.rstrip('/')
+    return f"{frontend_url}/share/{kind}/{item_id}"
+
 def get_current_user():
     token = None
     auth_header = request.headers.get('Authorization')
@@ -291,6 +303,42 @@ def get_analysis(analysis_id):
             return jsonify(response_data)
     except Exception as e:
         print(f"Error getting analysis: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@schedule_bp.route('/share/analyses/<analysis_id>', methods=['GET'])
+def get_public_shared_analysis(analysis_id):
+    language = request.args.get('language')
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT analysis_id, title, filename, reference_date, status,
+                       processing_time, model, language, predictive_insights,
+                       created_at, updated_at
+                FROM schedule_analyses
+                WHERE analysis_id = %s
+            """, (analysis_id,))
+            analysis = cur.fetchone()
+
+            if not analysis:
+                return jsonify({'success': False, 'error': 'Shared dashboard not found'}), 404
+
+            if analysis.get('status') != 'completed' or not analysis.get('predictive_insights'):
+                return jsonify({'success': False, 'error': 'Dashboard is not ready to share'}), 404
+
+            _isoformat_dates(analysis, 'created_at', 'updated_at')
+            analysis = _localize_analysis_payload(analysis, language)
+            analysis['share_url'] = _public_share_url('schedule', analysis_id)
+
+            return jsonify({'success': True, 'type': 'schedule', 'analysis': analysis})
+    except Exception as e:
+        print(f"Error getting public shared analysis: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         conn.close()
@@ -892,6 +940,42 @@ def get_comparison(comparison_id):
             return jsonify({'success': True, 'comparison': comparison})
     except Exception as e:
         print(f"Error getting comparison: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@schedule_bp.route('/share/comparisons/<comparison_id>', methods=['GET'])
+def get_public_shared_comparison(comparison_id):
+    language = request.args.get('language')
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT comparison_id, title, old_filename, new_filename, status,
+                       dashboard_html, use_nusf, language, processing_time,
+                       created_at, updated_at
+                FROM schedule_comparisons
+                WHERE comparison_id = %s
+            """, (comparison_id,))
+            comparison = cur.fetchone()
+
+            if not comparison:
+                return jsonify({'success': False, 'error': 'Shared dashboard not found'}), 404
+
+            if comparison.get('status') != 'completed' or not comparison.get('dashboard_html'):
+                return jsonify({'success': False, 'error': 'Dashboard is not ready to share'}), 404
+
+            _isoformat_dates(comparison, 'created_at', 'updated_at')
+            comparison = _localize_comparison_payload(comparison, language)
+            comparison['share_url'] = _public_share_url('comparison', comparison_id)
+
+            return jsonify({'success': True, 'type': 'comparison', 'comparison': comparison})
+    except Exception as e:
+        print(f"Error getting public shared comparison: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         conn.close()

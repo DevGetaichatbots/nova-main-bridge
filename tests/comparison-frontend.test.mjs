@@ -21,13 +21,19 @@ for (const method of [
 }
 assert.match(service, /\/api\/schedule\/comparisons/, "comparisonService should target schedule comparison API");
 
+const publicShareService = read("src/services/publicShareService.js");
+assert.match(publicShareService, /\/api\/schedule\/share\//, "public share service should target public dashboard share API");
+assert.doesNotMatch(publicShareService, /fetchWithAuth/, "public share service should not use auth-aware fetch");
+
 const componentPath = path.join(root, "src/components/ComparisonAnalysis.jsx");
 assert.equal(fs.existsSync(componentPath), true, "ComparisonAnalysis.jsx should exist");
 const component = read("src/components/ComparisonAnalysis.jsx");
+assert.match(component, /buildDashboardShareUrl\('comparison'/, "ComparisonAnalysis should build public comparison share links");
+assert.match(component, /onShareAnalysis=\{handleShareComparison\}/, "ComparisonAnalysis should expose share links in history");
 assert.match(component, /exportHtmlToPdf/, "ComparisonAnalysis should use the client-side HTML PDF exporter");
 assert.match(component, /<iframe[\s\S]*srcDoc=/, "ComparisonAnalysis should render dashboard HTML in an iframe srcDoc");
 assert.match(component, /sandbox="allow-scripts"/, "ComparisonAnalysis iframe should allow scripts without same-origin");
-assert.match(component, /<ChatWidget[\s\S]*oldSessionId=/, "ComparisonAnalysis should expose classic chat fallback with stored session IDs");
+assert.doesNotMatch(component, /Use Classic Analysis|Brug Klassisk Analyse|useClassic|setUseClassic|<ChatWidget/, "ComparisonAnalysis should not expose the classic analysis toggle");
 assert.match(component, /<FileComparisonModal/, "ComparisonAnalysis should reuse FileComparisonModal");
 assert.match(component, /useNusf:\s*useNusf/, "ComparisonAnalysis should forward NUSF selection to dashboard generation");
 assert.match(component, /<AnalysisPageShell/, "ComparisonAnalysis should use the shared analysis shell");
@@ -39,6 +45,7 @@ assert.match(uploadModal, /useNusf,\s*\n\s*\}\);/, "FileComparisonModal should i
 const app = read("src/App.jsx");
 assert.match(app, /ComparisonAnalysis/, "App should import/lazy-load ComparisonAnalysis");
 assert.match(app, /path="\/comparison"/, "App should register /comparison route");
+assert.match(app, /path="\/share\/:type\/:id"[\s\S]*<PublicDashboardShare/, "App should register public share route outside protected chrome");
 
 const navbar = read("src/components/Navbar.jsx");
 assert.match(navbar, /to="\/comparison"/, "Navbar should link to the comparison dashboard route");
@@ -50,6 +57,8 @@ assert.match(shell, /h-\[calc\(100vh-3\.5rem\)\]/, "AnalysisPageShell should loc
 assert.match(shell, /overflow-hidden/, "AnalysisPageShell should own overflow for sidebar and main panel");
 
 const scheduleAnalysis = read("src/components/ScheduleAnalysis.jsx");
+assert.match(scheduleAnalysis, /buildDashboardShareUrl\('schedule'/, "ScheduleAnalysis should build public schedule share links");
+assert.match(scheduleAnalysis, /onShareAnalysis=\{handleShareAnalysis\}/, "ScheduleAnalysis should expose share links in history");
 assert.match(scheduleAnalysis, /<AnalysisPageShell/, "ScheduleAnalysis should use the shared analysis shell");
 assert.match(scheduleAnalysis, /exportHtmlToPdf/, "ScheduleAnalysis should use the client-side dashboard replica PDF exporter");
 assert.doesNotMatch(scheduleAnalysis, /exportDashboardPdf/, "ScheduleAnalysis should not use the custom structured predictive PDF exporter");
@@ -61,6 +70,22 @@ assert.doesNotMatch(scheduleService, /\/api\/schedule\/export-pdf/, "scheduleSer
 
 const scheduleRoutes = read("Nova-Insights-Backend/routes/schedule.py");
 assert.doesNotMatch(scheduleRoutes, /pdfshift/i, "schedule routes should not contain the old PDFShift dashboard export path");
+assert.match(scheduleRoutes, /@schedule_bp\.route\('\/share\/analyses\/<analysis_id>'/, "schedule routes should expose public schedule share endpoint");
+assert.match(scheduleRoutes, /@schedule_bp\.route\('\/share\/comparisons\/<comparison_id>'/, "schedule routes should expose public comparison share endpoint");
+assert.doesNotMatch(
+  scheduleRoutes.match(/def get_public_shared_analysis[\s\S]*?def download_analysis_pdf/)?.[0] || "",
+  /get_current_user/,
+  "public schedule share endpoint should not require auth",
+);
+assert.doesNotMatch(
+  scheduleRoutes.match(/def get_public_shared_comparison[\s\S]*?def download_comparison_pdf/)?.[0] || "",
+  /get_current_user/,
+  "public comparison share endpoint should not require auth",
+);
+
+const publicShare = read("src/components/PublicDashboardShare.jsx");
+assert.match(publicShare, /sandbox=\{isComparison \? 'allow-scripts' : 'allow-scripts allow-same-origin'\}/, "public share iframe should keep dashboard scripts interactive");
+assert.doesNotMatch(publicShare, /Navbar|ScheduleAnalysisSidebar|ProtectedRoute|ChatWidget/, "public share view should not render app chrome or history");
 
 const exportPdf = read("src/utils/exportPdf.js");
 assert.match(exportPdf, /export async function exportHtmlToPdf/, "exportPdf should expose an HTML-to-PDF browser capture helper");

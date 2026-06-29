@@ -25,6 +25,7 @@ const ChatWidget = lazy(() => import("./components/ChatWidget"));
 const FileComparisonModal = lazy(() => import("./components/FileComparisonModal"));
 const ScheduleAnalysis = lazy(() => import("./components/ScheduleAnalysis"));
 const ComparisonAnalysis = lazy(() => import("./components/ComparisonAnalysis"));
+const PublicDashboardShare = lazy(() => import("./components/PublicDashboardShare"));
 const AdminPortal = lazy(() => import("./components/AdminPortal"));
 const CompanyPortal = lazy(() => import("./components/CompanyPortal"));
 const SuperAdminPortal = lazy(() => import("./components/SuperAdminPortal"));
@@ -2293,6 +2294,8 @@ function App() {
       <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
         <Routes>
+          <Route path="/share/:type/:id" element={<PublicDashboardShare />} />
+
           {/* Protected Routes - Only accessible when logged in */}
           <Route
             path="/"

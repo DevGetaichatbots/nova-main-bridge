@@ -15,6 +15,7 @@ const ScheduleAnalysisSidebar = ({
   onNewAnalysis,
   onDeleteAnalysis,
   onRenameAnalysis,
+  onShareAnalysis,
   isLoadingList,
   isCreating,
   isOpen,
@@ -218,6 +219,17 @@ const ScheduleAnalysisSidebar = ({
 
                   {!isRenaming && (
                     <div className={`flex items-center gap-0.5 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                      {analysis.status === 'completed' && onShareAnalysis && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onShareAnalysis(analysis.analysis_id); }}
+                          className="p-1 rounded-lg hover:bg-[#1eb5ee]/15 transition-colors"
+                          title="Copy share link"
+                        >
+                          <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.59 13.51a3 3 0 010-4.24l2.12-2.12a3 3 0 014.24 4.24l-.35.35m-1.18-1.18a3 3 0 010 4.24l-2.12 2.12a3 3 0 01-4.24-4.24l.35-.35" />
+                          </svg>
+                        </button>
+                      )}
                       <button
                         onClick={(e) => handleStartRename(e, analysis)}
                         className="p-1 rounded-lg hover:bg-[#1eb5ee]/15 transition-colors"
