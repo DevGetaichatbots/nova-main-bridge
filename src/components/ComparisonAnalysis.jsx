@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { chatService } from '../services/chatService';
 import { comparisonService } from '../services/comparisonService';
-import { scheduleService } from '../services/scheduleService';
 import { localizeComparisonDashboardHtml } from '../utils/reportLocalization';
+import { exportHtmlToPdf } from '../utils/exportPdf';
 import ChatWidget from './ChatWidget';
 import FileComparisonModal from './FileComparisonModal';
 import AnalysisPageShell from './AnalysisPageShell';
@@ -31,7 +31,6 @@ const ComparisonAnalysis = ({ user }) => {
   const [uploadSessionId, setUploadSessionId] = useState(null);
   const [useClassic, setUseClassic] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const iframeRef = useRef(null);
 
@@ -185,23 +184,8 @@ const ComparisonAnalysis = ({ user }) => {
       if (doc?.body) {
         event.target.style.height = `${doc.body.scrollHeight + 32}px`;
       }
-    } catch (_err) {
+    } catch {
       event.target.style.height = '100vh';
-    }
-  };
-
-  const handleDownloadPdf = async () => {
-    if (!activeComparisonId || isDownloadingPdf) return;
-    setIsDownloadingPdf(true);
-    setError(null);
-    try {
-      const lang = i18n.language?.substring(0, 2) || 'en';
-      await comparisonService.downloadPdf(activeComparisonId, lang);
-    } catch (err) {
-      console.error('Dashboard PDF download error:', err);
-      setError('Failed to download dashboard PDF. Please try again.');
-    } finally {
-      setIsDownloadingPdf(false);
     }
   };
 
@@ -327,14 +311,18 @@ const ComparisonAnalysis = ({ user }) => {
                 onClick={async () => {
                   if (isExportingPdf) return;
                   setIsExportingPdf(true);
+                  setError(null);
                   try {
                     const html = localizeComparisonDashboardHtml(activeComparison.dashboard_html, i18n.language);
-                    await scheduleService.exportDashboardPdf(
+                    await exportHtmlToPdf(
                       html,
                       (activeComparison.title || 'health-dashboard') + '.pdf',
                     );
                   } catch (e) {
                     console.error('PDF export error:', e);
+                    setError(i18n.language?.startsWith('da')
+                      ? 'Kunne ikke eksportere PDF. Prøv venligst igen.'
+                      : 'Failed to export PDF. Please try again.');
                   } finally {
                     setIsExportingPdf(false);
                   }

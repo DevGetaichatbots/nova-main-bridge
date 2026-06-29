@@ -24,6 +24,7 @@ assert.match(service, /\/api\/schedule\/comparisons/, "comparisonService should 
 const componentPath = path.join(root, "src/components/ComparisonAnalysis.jsx");
 assert.equal(fs.existsSync(componentPath), true, "ComparisonAnalysis.jsx should exist");
 const component = read("src/components/ComparisonAnalysis.jsx");
+assert.match(component, /exportHtmlToPdf/, "ComparisonAnalysis should use the client-side HTML PDF exporter");
 assert.match(component, /<iframe[\s\S]*srcDoc=/, "ComparisonAnalysis should render dashboard HTML in an iframe srcDoc");
 assert.match(component, /sandbox="allow-scripts"/, "ComparisonAnalysis iframe should allow scripts without same-origin");
 assert.match(component, /<ChatWidget[\s\S]*oldSessionId=/, "ComparisonAnalysis should expose classic chat fallback with stored session IDs");
@@ -50,6 +51,24 @@ assert.match(shell, /overflow-hidden/, "AnalysisPageShell should own overflow fo
 
 const scheduleAnalysis = read("src/components/ScheduleAnalysis.jsx");
 assert.match(scheduleAnalysis, /<AnalysisPageShell/, "ScheduleAnalysis should use the shared analysis shell");
+assert.match(scheduleAnalysis, /exportHtmlToPdf/, "ScheduleAnalysis should use the client-side dashboard replica PDF exporter");
+assert.doesNotMatch(scheduleAnalysis, /exportDashboardPdf/, "ScheduleAnalysis should not use the custom structured predictive PDF exporter");
+assert.match(scheduleAnalysis, /exportHtmlToPdf\(\s*normalizePredictiveDashboardHtml/, "ScheduleAnalysis should normalize dashboard HTML only for PDF export");
+assert.match(scheduleAnalysis, /srcDoc=\{activeAnalysis\.predictive_insights\}/, "ScheduleAnalysis should render the original dashboard HTML in the iframe");
+
+const scheduleService = read("src/services/scheduleService.js");
+assert.doesNotMatch(scheduleService, /\/api\/schedule\/export-pdf/, "scheduleService should not call the PDFShift-backed export endpoint");
+
+const scheduleRoutes = read("Nova-Insights-Backend/routes/schedule.py");
+assert.doesNotMatch(scheduleRoutes, /pdfshift/i, "schedule routes should not contain the old PDFShift dashboard export path");
+
+const exportPdf = read("src/utils/exportPdf.js");
+assert.match(exportPdf, /export async function exportHtmlToPdf/, "exportPdf should expose an HTML-to-PDF browser capture helper");
+assert.match(exportPdf, /export async function exportDashboardPdf/, "exportPdf should expose the structured predictive PDF helper");
+
+const reportLocalization = read("src/utils/reportLocalization.js");
+assert.match(reportLocalization, /nova-dashboard-alignment-fixes/, "reportLocalization should inject dashboard alignment fixes");
+assert.match(reportLocalization, /normalizePredictiveDashboardHtml/, "reportLocalization should expose dashboard HTML normalization");
 
 const chatWidget = read("src/components/ChatWidget.jsx");
 assert.match(chatWidget, /isFullPage \? 'w-full h-full flex-1 min-h-0'/, "ChatWidget full-page mode should claim the available shell height");

@@ -26,11 +26,6 @@ const MT = 14;
 const CW = PAGE_W - ML - MR;
 
 // ── helpers ────────────────────────────────────────────────────────────────
-function hex2rgb(h) {
-  const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16);
-  return [r,g,b];
-}
-
 function setFill(doc, rgb)   { doc.setFillColor(...rgb); }
 function setDraw(doc, rgb)   { doc.setDrawColor(...rgb); }
 function setColor(doc, rgb)  { doc.setTextColor(...rgb); }
@@ -60,6 +55,14 @@ function priLabel(p='') {
   if (p.includes('CRITICAL'))  return 'CRITICAL';
   if (p.includes('IMPORTANT')) return 'IMPORTANT';
   return 'MONITOR';
+}
+
+function safePdfFilename(filename, fallback = 'dashboard.pdf') {
+  const base = String(filename || fallback)
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^a-zA-Z0-9._ -]/g, '')
+    .trim() || fallback.replace(/\.pdf$/i, '');
+  return `${base}.pdf`;
 }
 
 // ── page management ────────────────────────────────────────────────────────
@@ -365,47 +368,173 @@ export async function exportDashboardPdf(html, filename = 'dashboard.pdf') {
     text(doc, `Page ${i} of ${pageCount}`, PAGE_W - MR, PAGE_H - 3, { align: 'right' });
   }
 
-  doc.save(filename);
+  doc.save(safePdfFilename(filename));
 }
 
-// health dashboard — still use iframe capture as it's fully static HTML
+async function captureDocumentToPdf(doc2, filename) {
+  const { default: html2pdf } = await import('html2pdf.js');
+  const exportWidthPx = Math.max(doc2.documentElement.scrollWidth, doc2.body.scrollWidth, 1440);
+  const exportHeightPx = Math.max(doc2.documentElement.scrollHeight, doc2.body.scrollHeight, 1200);
+  const pxToMm = 0.264583;
+  const pageWidthMm = exportWidthPx * pxToMm;
+  const pageHeightMm = exportHeightPx * pxToMm;
+
+  await html2pdf()
+    .set({
+      filename: safePdfFilename(filename),
+      margin: 0,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        scale: 2,
+        scrollX: 0,
+        scrollY: 0,
+        width: exportWidthPx,
+        height: exportHeightPx,
+        windowWidth: exportWidthPx,
+        windowHeight: exportHeightPx,
+        onclone: (clonedDoc) => {
+          clonedDoc.head.innerHTML = doc2.head.innerHTML;
+        },
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: [pageWidthMm, pageHeightMm],
+        orientation: pageWidthMm > pageHeightMm ? 'landscape' : 'portrait',
+      },
+      pagebreak: { mode: ['css', 'legacy'] },
+    })
+    .from(doc2.documentElement)
+    .save();
+}
+
+function waitForIframeLoad(iframe) {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error('PDF render timed out')), 15000);
+    iframe.onload = () => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        window.clearTimeout(timeout);
+        resolve();
+      }));
+    };
+  });
+}
+
+async function waitForDocumentAssets(doc2) {
+  const fontReady = doc2.fonts?.ready?.catch?.(() => undefined) || Promise.resolve();
+  const imageReady = Array.from(doc2.images || []).map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.onload = resolve;
+      img.onerror = resolve;
+    });
+  });
+  await Promise.race([
+    Promise.all([fontReady, ...imageReady]),
+    new Promise(resolve => window.setTimeout(resolve, 3000)),
+  ]);
+}
+
+async function waitForStableLayout(doc2) {
+  let lastHeight = 0;
+  let stableFrames = 0;
+  for (let i = 0; i < 30 && stableFrames < 3; i += 1) {
+    await new Promise(resolve => window.requestAnimationFrame(resolve));
+    const nextHeight = doc2.body.scrollHeight;
+    if (Math.abs(nextHeight - lastHeight) < 2) {
+      stableFrames += 1;
+    } else {
+      stableFrames = 0;
+      lastHeight = nextHeight;
+    }
+  }
+}
+
+function normalizeCaptureBadges(doc2) {
+  const shortBadgeText = /^(?:\d+\s*)?(?:critical|important|monitor|design|vvs|client|coordination|bygherre|milestone)$/i;
+
+  doc2.querySelectorAll('span, div').forEach(el => {
+    const textValue = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!textValue || textValue.length > 32) return;
+
+    const style = el.getAttribute('style') || '';
+    const computed = doc2.defaultView?.getComputedStyle(el);
+    const radius = computed?.borderRadius || '';
+    const hasRoundedShape = style.includes('border-radius') || radius !== '0px';
+    const hasBadgePaint = style.includes('background') || style.includes('border') || computed?.backgroundColor !== 'rgba(0, 0, 0, 0)';
+    if (!hasRoundedShape || !hasBadgePaint) return;
+
+    const rect = el.getBoundingClientRect();
+    const isCircle = /^\d+$/.test(textValue) && Math.abs(rect.width - rect.height) <= 6 && rect.width <= 42;
+    const isBadge = shortBadgeText.test(textValue);
+    if (!isCircle && !isBadge) return;
+
+    const targetHeight = isCircle
+      ? Math.max(Math.round(rect.height), Math.round(rect.width), 24)
+      : Math.max(Math.round(rect.height), 18);
+
+    Object.assign(el.style, {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxSizing: 'border-box',
+      lineHeight: `${targetHeight}px`,
+      height: `${targetHeight}px`,
+      minHeight: `${targetHeight}px`,
+      paddingTop: '0',
+      paddingBottom: '0',
+      textAlign: 'center',
+      verticalAlign: 'middle',
+      whiteSpace: 'nowrap',
+    });
+
+    if (isCircle) {
+      const size = `${targetHeight}px`;
+      el.style.width = size;
+      el.style.minWidth = size;
+      el.style.borderRadius = '50%';
+    }
+  });
+}
+
+export async function exportHtmlToPdf(html, filename = 'dashboard.pdf') {
+  if (!html) throw new Error('No HTML provided for PDF export');
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.left = '-10000px';
+  iframe.style.top = '0';
+  iframe.style.width = '1440px';
+  iframe.style.height = '2000px';
+  iframe.style.border = '0';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
+
+  try {
+    const loaded = waitForIframeLoad(iframe);
+    iframe.srcdoc = html;
+    await loaded;
+
+    const doc2 = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc2) throw new Error('Cannot access PDF export document');
+
+    await waitForDocumentAssets(doc2);
+    await waitForStableLayout(doc2);
+    normalizeCaptureBadges(doc2);
+    await waitForStableLayout(doc2);
+    iframe.style.height = `${Math.max(doc2.body.scrollHeight, 1200)}px`;
+    await new Promise(resolve => window.requestAnimationFrame(() => resolve()));
+    await captureDocumentToPdf(doc2, filename);
+  } finally {
+    iframe.remove();
+  }
+}
+
+// health dashboard display iframe fallback
 export async function exportIframeToPdf(iframeEl, filename = 'dashboard.pdf') {
-  const { default: html2canvas } = await import('html2canvas');
   const doc2 = iframeEl.contentDocument || iframeEl.contentWindow?.document;
   if (!doc2) throw new Error('Cannot access iframe document');
-
-  const canvas = await html2canvas(doc2.body, {
-    useCORS: true,
-    allowTaint: true,
-    backgroundColor: '#ffffff',
-    scale: 2,
-    scrollX: 0,
-    scrollY: 0,
-    width: doc2.body.scrollWidth,
-    height: doc2.body.scrollHeight,
-  });
-
-  const imgData = canvas.toDataURL('image/png');
-  const pw = 210, ph = 297;
-  const iw = pw;
-  const ih = (canvas.height * pw) / canvas.width;
-  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-
-  let remaining = ih;
-  let srcY = 0;
-
-  while (remaining > 0) {
-    const sliceH = Math.min(ph, remaining);
-    const sliceCanvas = document.createElement('canvas');
-    sliceCanvas.width = canvas.width;
-    sliceCanvas.height = (sliceH / ih) * canvas.height;
-    const ctx = sliceCanvas.getContext('2d');
-    ctx.drawImage(canvas, 0, srcY * (canvas.height / ih), canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
-    pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 0, 0, pw, sliceH);
-    remaining -= ph;
-    srcY += ph;
-    if (remaining > 0) pdf.addPage();
-  }
-
-  pdf.save(filename);
+  await captureDocumentToPdf(doc2, filename);
 }

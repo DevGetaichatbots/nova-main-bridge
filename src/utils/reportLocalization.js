@@ -51,3 +51,56 @@ export const localizePredictiveReportHtml = (html, language) => {
   if (!html || !language?.startsWith('da')) return html;
   return replaceAll(html, PREDICTIVE_REPORT_REPLACEMENTS_DA);
 };
+
+const PREDICTIVE_DASHBOARD_ALIGNMENT_CSS = `
+<style id="nova-dashboard-alignment-fixes">
+  span[style*="border-radius"][style*="font-weight"],
+  div[style*="border-radius"][style*="font-weight"][style*="background"],
+  [style*="border-radius: 6px"],
+  [style*="border-radius:6px"],
+  [style*="border-radius: 8px"],
+  [style*="border-radius:8px"] {
+    display: inline-grid !important;
+    place-items: center !important;
+    align-content: center !important;
+    line-height: 1 !important;
+    box-sizing: border-box !important;
+    vertical-align: middle !important;
+    white-space: nowrap !important;
+    min-height: 18px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    text-align: center !important;
+    transform: translateY(0) !important;
+  }
+
+  div[style*="border-radius:50%"],
+  div[style*="border-radius: 50%"],
+  span[style*="border-radius:50%"],
+  span[style*="border-radius: 50%"] {
+    display: inline-grid !important;
+    place-items: center !important;
+    align-content: center !important;
+    line-height: 1 !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+    aspect-ratio: 1 / 1 !important;
+    padding: 0 !important;
+  }
+
+  span[style*="border-radius"][style*="font-weight"],
+  div[style*="border-radius"][style*="font-weight"][style*="background"] {
+    text-shadow: 0 0 0 currentColor !important;
+  }
+</style>`;
+
+export const normalizePredictiveDashboardHtml = (html, language) => {
+  const localized = localizePredictiveReportHtml(html, language);
+  if (!localized || localized.includes('nova-dashboard-alignment-fixes')) return localized;
+
+  if (localized.includes('</head>')) {
+    return localized.replace('</head>', `${PREDICTIVE_DASHBOARD_ALIGNMENT_CSS}</head>`);
+  }
+
+  return `${PREDICTIVE_DASHBOARD_ALIGNMENT_CSS}${localized}`;
+};

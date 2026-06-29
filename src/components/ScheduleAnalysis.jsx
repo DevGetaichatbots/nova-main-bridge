@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next';
 import DOMPurify from 'dompurify';
 import { scheduleService } from '../services/scheduleService';
-import { localizePredictiveReportHtml } from '../utils/reportLocalization';
+import { localizePredictiveReportHtml, normalizePredictiveDashboardHtml } from '../utils/reportLocalization';
+import { exportHtmlToPdf } from '../utils/exportPdf';
 import AnalysisPageShell from './AnalysisPageShell';
 import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
 
@@ -23,7 +24,7 @@ const SCHEDULE_NAV_SECTIONS = [
   { id: 'predictive-forcing-assessment',    labelEn: 'Forcing Assessment',     labelDa: 'Forceringsmuligheder' },
 ];
 
-const ScheduleAnalysis = ({ user }) => {
+const ScheduleAnalysis = () => {
   const { t, i18n } = useTranslation();
   const [analyses, setAnalyses] = useState([]);
   const [activeAnalysisId, setActiveAnalysisId] = useState(null);
@@ -37,7 +38,6 @@ const ScheduleAnalysis = ({ user }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [navSections, setNavSections] = useState([]);
   const [activeSectionId, setActiveSectionId] = useState(null);
@@ -116,7 +116,9 @@ const ScheduleAnalysis = ({ user }) => {
         if (data && data.stage && data.stage !== 'unknown' && data.step > 0) {
           setProgressData(data);
         }
-      } catch (e) {}
+      } catch {
+        // Progress polling is best-effort; the timed progress fallback keeps the UI moving.
+      }
     };
 
     pollProgress();
@@ -331,7 +333,9 @@ const ScheduleAnalysis = ({ user }) => {
           setError(t('scheduleAnalysis.errors.csvRowLimit', { count: dataRows.toLocaleString(), max: '5,000' }));
           return;
         }
-      } catch {}
+      } catch {
+        // If CSV row counting fails, let the normal upload validation handle the file.
+      }
     }
 
     setIsProcessing(true);
@@ -629,20 +633,6 @@ const ScheduleAnalysis = ({ user }) => {
     );
   };
 
-  const handleDownloadPdf = async () => {
-    if (!activeAnalysisId || isDownloadingPdf) return;
-    setIsDownloadingPdf(true);
-    try {
-      const lang = i18n.language?.substring(0, 2) || 'en';
-      await scheduleService.downloadPdf(activeAnalysisId, lang);
-    } catch (err) {
-      console.error('PDF download error:', err);
-      setError(t('scheduleAnalysis.errors.pdfFailed'));
-    } finally {
-      setIsDownloadingPdf(false);
-    }
-  };
-
   const isDashboardHtml = useCallback((html) => {
     return typeof html === 'string' && html.includes('window.__pdData');
   }, []);
@@ -689,13 +679,15 @@ const ScheduleAnalysis = ({ user }) => {
             onClick={async () => {
               if (isExportingPdf) return;
               setIsExportingPdf(true);
+              setError(null);
               try {
-                await scheduleService.exportDashboardPdf(
-                  activeAnalysis.predictive_insights,
+                await exportHtmlToPdf(
+                  normalizePredictiveDashboardHtml(activeAnalysis.predictive_insights, i18n.language),
                   (activeAnalysis.filename || 'dashboard').replace(/\.[^.]+$/, '') + '.pdf',
                 );
               } catch (e) {
                 console.error('PDF export error:', e);
+                setError(t('scheduleAnalysis.errors.pdfFailed'));
               } finally {
                 setIsExportingPdf(false);
               }
