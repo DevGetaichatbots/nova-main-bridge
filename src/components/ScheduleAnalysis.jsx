@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import DOMPurify from 'dompurify';
 import { scheduleService } from '../services/scheduleService';
 import { localizePredictiveReportHtml, normalizePredictiveDashboardHtml } from '../utils/reportLocalization';
-import { exportHtmlToPdf } from '../utils/exportPdf';
+import { exportDashboardPdfViaServer } from '../utils/exportPdf';
 import { buildDashboardShareUrl, copyTextToClipboard } from '../utils/shareLinks';
 import AnalysisPageShell from './AnalysisPageShell';
 import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
@@ -707,7 +707,7 @@ const ScheduleAnalysis = () => {
                 setIsExportingPdf(true);
                 setError(null);
                 try {
-                  await exportHtmlToPdf(
+                  await exportDashboardPdfViaServer(
                     normalizePredictiveDashboardHtml(activeAnalysis.predictive_insights, i18n.language),
                     (activeAnalysis.filename || 'dashboard').replace(/\.[^.]+$/, '') + '.pdf',
                   );

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { chatService } from '../services/chatService';
 import { comparisonService } from '../services/comparisonService';
 import { localizeComparisonDashboardHtml } from '../utils/reportLocalization';
-import { exportHtmlToPdf } from '../utils/exportPdf';
+import { exportDashboardPdfViaServer } from '../utils/exportPdf';
 import { buildDashboardShareUrl, copyTextToClipboard } from '../utils/shareLinks';
 import FileComparisonModal from './FileComparisonModal';
 import AnalysisPageShell from './AnalysisPageShell';
@@ -333,7 +333,7 @@ const ComparisonAnalysis = ({ user }) => {
                 setError(null);
                 try {
                   const html = localizeComparisonDashboardHtml(activeComparison.dashboard_html, i18n.language);
-                  await exportHtmlToPdf(
+                  await exportDashboardPdfViaServer(
                     html,
                     (activeComparison.title || 'health-dashboard') + '.pdf',
                   );

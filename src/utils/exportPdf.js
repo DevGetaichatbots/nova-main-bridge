@@ -1,4 +1,55 @@
 import jsPDF from 'jspdf';
+import { AGENT_BASE_URL } from '../services/chatService';
+
+// RAG server renders the dashboard HTML to a flawless single-wide-page vector
+// PDF via headless Chromium. Override with VITE_AGENT_BASE_URL for local testing
+// (e.g. point at a locally-running RAG server).
+const PDF_EXPORT_BASE_URL = import.meta.env.VITE_AGENT_BASE_URL || AGENT_BASE_URL;
+
+// Send the exact HTML being displayed to the server and download the returned
+// PDF silently. SVG charts stay vector, text selectable, colours preserved.
+export async function exportDashboardPdfViaServer(html, filename = 'dashboard.pdf') {
+  if (!html) throw new Error('No HTML provided for PDF export');
+
+  // Hard client-side ceiling so the button can never spin forever, even if the
+  // server stalls. The server's own render guard is ~90s; give it some slack.
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 120000);
+
+  let res;
+  try {
+    res = await fetch(`${PDF_EXPORT_BASE_URL}/export/pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html, filename: safePdfFilename(filename) }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('PDF export timed out');
+    throw e;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const j = await res.json();
+      if (j?.detail) detail = j.detail;
+    } catch { /* non-JSON error body */ }
+    throw new Error(`PDF export failed: ${detail}`);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = safePdfFilename(filename);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 // ── colours ────────────────────────────────────────────────────────────────
 const C = {
