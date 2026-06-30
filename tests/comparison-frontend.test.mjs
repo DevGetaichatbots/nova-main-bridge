@@ -30,7 +30,7 @@ assert.equal(fs.existsSync(componentPath), true, "ComparisonAnalysis.jsx should 
 const component = read("src/components/ComparisonAnalysis.jsx");
 assert.match(component, /buildDashboardShareUrl\('comparison'/, "ComparisonAnalysis should build public comparison share links");
 assert.match(component, /onShareAnalysis=\{handleShareComparison\}/, "ComparisonAnalysis should expose share links in history");
-assert.match(component, /exportHtmlToPdf/, "ComparisonAnalysis should use the client-side HTML PDF exporter");
+assert.match(component, /exportDashboardPdfViaServer/, "ComparisonAnalysis should use the server-side HTML PDF exporter");
 assert.match(component, /<iframe[\s\S]*srcDoc=/, "ComparisonAnalysis should render dashboard HTML in an iframe srcDoc");
 assert.match(component, /sandbox="allow-scripts"/, "ComparisonAnalysis iframe should allow scripts without same-origin");
 assert.doesNotMatch(component, /Use Classic Analysis|Brug Klassisk Analyse|useClassic|setUseClassic|<ChatWidget/, "ComparisonAnalysis should not expose the classic analysis toggle");
@@ -60,9 +60,9 @@ const scheduleAnalysis = read("src/components/ScheduleAnalysis.jsx");
 assert.match(scheduleAnalysis, /buildDashboardShareUrl\('schedule'/, "ScheduleAnalysis should build public schedule share links");
 assert.match(scheduleAnalysis, /onShareAnalysis=\{handleShareAnalysis\}/, "ScheduleAnalysis should expose share links in history");
 assert.match(scheduleAnalysis, /<AnalysisPageShell/, "ScheduleAnalysis should use the shared analysis shell");
-assert.match(scheduleAnalysis, /exportHtmlToPdf/, "ScheduleAnalysis should use the client-side dashboard replica PDF exporter");
-assert.doesNotMatch(scheduleAnalysis, /exportDashboardPdf/, "ScheduleAnalysis should not use the custom structured predictive PDF exporter");
-assert.match(scheduleAnalysis, /exportHtmlToPdf\(\s*normalizePredictiveDashboardHtml/, "ScheduleAnalysis should normalize dashboard HTML only for PDF export");
+assert.match(scheduleAnalysis, /exportDashboardPdfViaServer/, "ScheduleAnalysis should use the server-side dashboard PDF exporter");
+assert.doesNotMatch(scheduleAnalysis, /exportDashboardPdf\(/, "ScheduleAnalysis should not use the custom structured predictive PDF exporter");
+assert.match(scheduleAnalysis, /exportDashboardPdfViaServer\(\s*normalizePredictiveDashboardHtml/, "ScheduleAnalysis should normalize dashboard HTML only for PDF export");
 assert.match(scheduleAnalysis, /srcDoc=\{activeAnalysis\.predictive_insights\}/, "ScheduleAnalysis should render the original dashboard HTML in the iframe");
 
 const scheduleService = read("src/services/scheduleService.js");
@@ -85,10 +85,13 @@ assert.doesNotMatch(
 
 const publicShare = read("src/components/PublicDashboardShare.jsx");
 assert.match(publicShare, /sandbox=\{isComparison \? 'allow-scripts' : 'allow-scripts allow-same-origin'\}/, "public share iframe should keep dashboard scripts interactive");
+assert.match(publicShare, /exportDashboardPdfViaServer/, "public share view should reuse the existing server-side dashboard PDF exporter");
+assert.match(publicShare, /normalizePredictiveDashboardHtml/, "public share view should normalize predictive dashboard HTML for export");
+assert.match(publicShare, /Export PDF|Eksporter PDF/, "public share view should expose an export PDF action");
 assert.doesNotMatch(publicShare, /Navbar|ScheduleAnalysisSidebar|ProtectedRoute|ChatWidget/, "public share view should not render app chrome or history");
 
 const exportPdf = read("src/utils/exportPdf.js");
-assert.match(exportPdf, /export async function exportHtmlToPdf/, "exportPdf should expose an HTML-to-PDF browser capture helper");
+assert.match(exportPdf, /export async function exportDashboardPdfViaServer/, "exportPdf should expose the server-side HTML-to-PDF helper");
 assert.match(exportPdf, /export async function exportDashboardPdf/, "exportPdf should expose the structured predictive PDF helper");
 
 const reportLocalization = read("src/utils/reportLocalization.js");
