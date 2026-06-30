@@ -392,6 +392,7 @@ const ScheduleAnalysis = () => {
     if (!analysisId) return;
     try {
       const shareUrl = buildDashboardShareUrl('schedule', analysisId, i18n.language);
+      window.open(shareUrl, '_blank', 'noopener,noreferrer');
       await copyTextToClipboard(shareUrl);
       setShareFeedback(i18n.language?.startsWith('da') ? 'Link kopieret' : 'Link copied');
       setTimeout(() => setShareFeedback(''), 2400);

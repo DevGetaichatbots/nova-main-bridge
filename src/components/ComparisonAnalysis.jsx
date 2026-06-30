@@ -192,6 +192,7 @@ const ComparisonAnalysis = ({ user }) => {
     if (!comparisonId) return;
     try {
       const shareUrl = buildDashboardShareUrl('comparison', comparisonId, i18n.language);
+      window.open(shareUrl, '_blank', 'noopener,noreferrer');
       await copyTextToClipboard(shareUrl);
       setShareFeedback(i18n.language?.startsWith('da') ? 'Link kopieret' : 'Link copied');
       setTimeout(() => setShareFeedback(''), 2400);

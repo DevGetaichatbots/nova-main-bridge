@@ -29,6 +29,7 @@ const componentPath = path.join(root, "src/components/ComparisonAnalysis.jsx");
 assert.equal(fs.existsSync(componentPath), true, "ComparisonAnalysis.jsx should exist");
 const component = read("src/components/ComparisonAnalysis.jsx");
 assert.match(component, /buildDashboardShareUrl\('comparison'/, "ComparisonAnalysis should build public comparison share links");
+assert.match(component, /window\.open\(shareUrl,\s*'_blank',\s*'noopener,noreferrer'\)/, "ComparisonAnalysis share action should open the public dashboard in a new tab");
 assert.match(component, /onShareAnalysis=\{handleShareComparison\}/, "ComparisonAnalysis should expose share links in history");
 assert.match(component, /exportDashboardPdfViaServer/, "ComparisonAnalysis should use the server-side HTML PDF exporter");
 assert.match(component, /<iframe[\s\S]*srcDoc=/, "ComparisonAnalysis should render dashboard HTML in an iframe srcDoc");
@@ -58,6 +59,7 @@ assert.match(shell, /overflow-hidden/, "AnalysisPageShell should own overflow fo
 
 const scheduleAnalysis = read("src/components/ScheduleAnalysis.jsx");
 assert.match(scheduleAnalysis, /buildDashboardShareUrl\('schedule'/, "ScheduleAnalysis should build public schedule share links");
+assert.match(scheduleAnalysis, /window\.open\(shareUrl,\s*'_blank',\s*'noopener,noreferrer'\)/, "ScheduleAnalysis share action should open the public dashboard in a new tab");
 assert.match(scheduleAnalysis, /onShareAnalysis=\{handleShareAnalysis\}/, "ScheduleAnalysis should expose share links in history");
 assert.match(scheduleAnalysis, /<AnalysisPageShell/, "ScheduleAnalysis should use the shared analysis shell");
 assert.match(scheduleAnalysis, /exportDashboardPdfViaServer/, "ScheduleAnalysis should use the server-side dashboard PDF exporter");

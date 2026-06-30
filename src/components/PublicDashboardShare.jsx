@@ -23,6 +23,15 @@ const injectExportButtonIntoDashboardHtml = (inputHtml, { buttonLabel, exporting
 
   const exportControlMarkup = `
 <style id="nova-shared-export-style">
+  .nova-shared-export-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
   .nova-shared-export-button {
     display: inline-flex;
     align-items: center;
@@ -55,7 +64,7 @@ const injectExportButtonIntoDashboardHtml = (inputHtml, { buttonLabel, exporting
   .nova-shared-export-slot {
     display: inline-flex;
     align-items: center;
-    margin-right: 12px;
+    flex: 0 0 auto;
   }
 
   .nova-shared-export-icon {
@@ -72,7 +81,7 @@ const injectExportButtonIntoDashboardHtml = (inputHtml, { buttonLabel, exporting
     const iconSvg = '<svg class="nova-shared-export-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
 
     const ensureButton = () => {
-      if (document.getElementById('nova-shared-export-button')) return;
+      if (document.getElementById('nova-shared-export-button')) return true;
 
       const badge = document.querySelector([
         'span[style*="border-radius: 20px"]',
@@ -81,7 +90,7 @@ const injectExportButtonIntoDashboardHtml = (inputHtml, { buttonLabel, exporting
         'div[style*="border-radius:20px"]'
       ].join(','));
 
-      if (!badge || !badge.parentElement) return;
+      if (!badge || !badge.parentElement) return false;
 
       const slot = document.createElement('div');
       slot.className = 'nova-shared-export-slot';
@@ -97,13 +106,18 @@ const injectExportButtonIntoDashboardHtml = (inputHtml, { buttonLabel, exporting
 
       slot.appendChild(button);
 
-      const parent = badge.parentElement;
-      parent.style.display = 'flex';
-      parent.style.alignItems = 'center';
-      parent.style.justifyContent = 'flex-end';
-      parent.style.gap = '0';
-      parent.style.flexWrap = 'wrap';
-      parent.insertBefore(slot, badge);
+      const existingWrap = badge.closest('.nova-shared-export-wrap');
+      if (existingWrap) {
+        existingWrap.insertBefore(slot, badge);
+        return true;
+      }
+
+      const wrap = document.createElement('div');
+      wrap.className = 'nova-shared-export-wrap';
+      badge.parentElement.insertBefore(wrap, badge);
+      wrap.appendChild(slot);
+      wrap.appendChild(badge);
+      return true;
     };
 
     const setExportingState = (exporting) => {
@@ -119,14 +133,40 @@ const injectExportButtonIntoDashboardHtml = (inputHtml, { buttonLabel, exporting
       setExportingState(Boolean(event.data.exporting));
     });
 
+    let observer = null;
+    const startObserver = () => {
+      if (observer || document.getElementById('nova-shared-export-button')) return;
+      observer = new MutationObserver(() => {
+        if (ensureButton()) {
+          observer.disconnect();
+          observer = null;
+        }
+      });
+      if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+      }
+    };
+
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', ensureButton, { once: true });
-    } else {
-      ensureButton();
+      document.addEventListener('DOMContentLoaded', () => {
+        if (!ensureButton()) startObserver();
+      }, { once: true });
+    } else if (!ensureButton()) {
+      startObserver();
     }
 
-    window.addEventListener('load', ensureButton, { once: true });
-    window.setTimeout(ensureButton, 150);
+    window.addEventListener('load', () => {
+      if (!ensureButton()) startObserver();
+    }, { once: true });
+    window.setTimeout(() => {
+      if (!ensureButton()) startObserver();
+    }, 150);
+    window.setTimeout(() => {
+      if (!ensureButton()) startObserver();
+    }, 600);
+    window.setTimeout(() => {
+      if (!ensureButton()) startObserver();
+    }, 1500);
   })();
 </script>`;
 
