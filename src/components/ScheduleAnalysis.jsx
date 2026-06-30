@@ -390,15 +390,26 @@ const ScheduleAnalysis = () => {
 
   const handleShareAnalysis = async (analysisId = activeAnalysisId) => {
     if (!analysisId) return;
+    const isDanish = i18n.language?.startsWith('da');
     try {
       const shareUrl = buildDashboardShareUrl('schedule', analysisId, i18n.language);
+      let copied = true;
+
+      try {
+        await copyTextToClipboard(shareUrl);
+      } catch (err) {
+        copied = false;
+        console.warn('Share link copy failed:', err);
+      }
+
       window.open(shareUrl, '_blank', 'noopener,noreferrer');
-      await copyTextToClipboard(shareUrl);
-      setShareFeedback(i18n.language?.startsWith('da') ? 'Link kopieret' : 'Link copied');
+      setShareFeedback(copied
+        ? (isDanish ? 'Link kopieret' : 'Link copied')
+        : (isDanish ? 'Link aabnet i ny fane' : 'Link opened in new tab'));
       setTimeout(() => setShareFeedback(''), 2400);
     } catch (err) {
-      console.error('Share link copy failed:', err);
-      setError(i18n.language?.startsWith('da') ? 'Kunne ikke kopiere linket.' : 'Could not copy the share link.');
+      console.error('Share link open failed:', err);
+      setError(isDanish ? 'Kunne ikke aabne linket.' : 'Could not open the share link.');
     }
   };
 
