@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import DOMPurify from 'dompurify';
@@ -14,174 +14,10 @@ const Spinner = () => (
   <div className="w-10 h-10 rounded-full border-4 border-slate-200 border-t-[#1eb5ee] animate-spin" />
 );
 
-const SHARED_EXPORT_TRIGGER = 'nova-shared-dashboard-export-pdf';
-const SHARED_EXPORT_STATE = 'nova-shared-dashboard-export-state';
-
-const injectExportButtonIntoDashboardHtml = (inputHtml, { buttonLabel, exportingLabel }) => {
-  if (!inputHtml) return inputHtml;
-  if (inputHtml.includes('nova-shared-export-button')) return inputHtml;
-
-  const exportControlMarkup = `
-<style id="nova-shared-export-style">
-  .nova-shared-export-wrap {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 12px;
-    flex-wrap: wrap;
-    max-width: 100%;
-  }
-
-  .nova-shared-export-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    border: 1px solid #cbd5e1;
-    border-radius: 12px;
-    background: #ffffff;
-    padding: 10px 16px;
-    color: #334155;
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 1;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-    cursor: pointer;
-    transition: box-shadow 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
-  }
-
-  .nova-shared-export-button:hover {
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-    transform: translateY(-1px);
-  }
-
-  .nova-shared-export-button:disabled {
-    opacity: 0.6;
-    cursor: wait;
-    transform: none;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-  }
-
-  .nova-shared-export-slot {
-    display: inline-flex;
-    align-items: center;
-    flex: 0 0 auto;
-  }
-
-  .nova-shared-export-icon {
-    width: 16px;
-    height: 16px;
-    display: inline-block;
-  }
-</style>
-<script id="nova-shared-export-script">
-  (() => {
-    const BUTTON_LABEL = ${JSON.stringify(buttonLabel)};
-    const EXPORTING_LABEL = ${JSON.stringify(exportingLabel)};
-
-    const iconSvg = '<svg class="nova-shared-export-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
-
-    const ensureButton = () => {
-      if (document.getElementById('nova-shared-export-button')) return true;
-
-      const badge = document.querySelector([
-        'span[style*="border-radius: 20px"]',
-        'span[style*="border-radius:20px"]',
-        'div[style*="border-radius: 20px"]',
-        'div[style*="border-radius:20px"]'
-      ].join(','));
-
-      if (!badge || !badge.parentElement) return false;
-
-      const slot = document.createElement('div');
-      slot.className = 'nova-shared-export-slot';
-
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.id = 'nova-shared-export-button';
-      button.className = 'nova-shared-export-button';
-      button.innerHTML = iconSvg + '<span>' + BUTTON_LABEL + '</span>';
-      button.addEventListener('click', () => {
-        window.parent.postMessage({ type: '${SHARED_EXPORT_TRIGGER}' }, '*');
-      });
-
-      slot.appendChild(button);
-
-      const existingWrap = badge.closest('.nova-shared-export-wrap');
-      if (existingWrap) {
-        existingWrap.insertBefore(slot, badge);
-        return true;
-      }
-
-      const wrap = document.createElement('div');
-      wrap.className = 'nova-shared-export-wrap';
-      badge.parentElement.insertBefore(wrap, badge);
-      wrap.appendChild(slot);
-      wrap.appendChild(badge);
-      return true;
-    };
-
-    const setExportingState = (exporting) => {
-      const button = document.getElementById('nova-shared-export-button');
-      if (!button) return;
-      const label = button.querySelector('span');
-      button.disabled = Boolean(exporting);
-      if (label) label.textContent = exporting ? EXPORTING_LABEL : BUTTON_LABEL;
-    };
-
-    window.addEventListener('message', (event) => {
-      if (event?.data?.type !== '${SHARED_EXPORT_STATE}') return;
-      setExportingState(Boolean(event.data.exporting));
-    });
-
-    let observer = null;
-    const startObserver = () => {
-      if (observer || document.getElementById('nova-shared-export-button')) return;
-      observer = new MutationObserver(() => {
-        if (ensureButton()) {
-          observer.disconnect();
-          observer = null;
-        }
-      });
-      if (document.body) {
-        observer.observe(document.body, { childList: true, subtree: true });
-      }
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        if (!ensureButton()) startObserver();
-      }, { once: true });
-    } else if (!ensureButton()) {
-      startObserver();
-    }
-
-    window.addEventListener('load', () => {
-      if (!ensureButton()) startObserver();
-    }, { once: true });
-    window.setTimeout(() => {
-      if (!ensureButton()) startObserver();
-    }, 150);
-    window.setTimeout(() => {
-      if (!ensureButton()) startObserver();
-    }, 600);
-    window.setTimeout(() => {
-      if (!ensureButton()) startObserver();
-    }, 1500);
-  })();
-</script>`;
-
-  if (inputHtml.includes('</head>')) {
-    return inputHtml.replace('</head>', `${exportControlMarkup}</head>`);
-  }
-
-  return `${exportControlMarkup}${inputHtml}`;
-};
-
 const PublicDashboardShare = () => {
   const { type, id } = useParams();
   const [searchParams] = useSearchParams();
   const { i18n } = useTranslation();
-  const iframeRef = useRef(null);
   const [dashboard, setDashboard] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -287,62 +123,53 @@ const PublicDashboardShare = () => {
     return `${baseName.replace(/\.[^.]+$/, '')}.pdf`;
   }, [dashboard, isComparison]);
 
-  const embeddedDashboardHtml = useMemo(() => {
-    if (!isDashboardHtml) return '';
-
-    return injectExportButtonIntoDashboardHtml(html, {
-      buttonLabel: i18n.language?.startsWith('da') ? 'Eksporter PDF' : 'Export PDF',
-      exportingLabel: i18n.language?.startsWith('da') ? 'Eksporterer...' : 'Exporting...',
-    });
-  }, [html, i18n.language, isDashboardHtml]);
-
   const handleExportPdf = async () => {
     if (!exportHtml || isExportingPdf) return;
 
     setIsExportingPdf(true);
     setExportError('');
-    iframeRef.current?.contentWindow?.postMessage({ type: SHARED_EXPORT_STATE, exporting: true }, '*');
     try {
       await exportDashboardPdfViaServer(exportHtml, exportFilename);
     } catch (err) {
       console.error('Shared PDF export error:', err);
       setExportError(err.message || 'Failed to export PDF');
     } finally {
-      iframeRef.current?.contentWindow?.postMessage({ type: SHARED_EXPORT_STATE, exporting: false }, '*');
       setIsExportingPdf(false);
     }
   };
 
-  useEffect(() => {
-    const handleMessage = (event) => {
-      if (event?.data?.type !== SHARED_EXPORT_TRIGGER) return;
-      handleExportPdf();
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [handleExportPdf]);
-
-  const exportButton = (
-    <div className="flex items-center gap-3">
-      {exportError && <span className="max-w-xs text-right text-xs font-medium text-red-600">{exportError}</span>}
-      <button
-        onClick={handleExportPdf}
-        disabled={isExportingPdf}
-        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md disabled:opacity-50"
-      >
-        {isExportingPdf ? (
-          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-        ) : (
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        )}
-        {i18n.language?.startsWith('da') ? 'Eksporter PDF' : 'Export PDF'}
-      </button>
+  const topBar = (
+    <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
+      <div className="mx-auto flex min-h-[52px] max-w-[1600px] items-center justify-between gap-4 px-4 py-2">
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+            {i18n.language?.startsWith('da') ? 'Delt Dashboard' : 'Shared Dashboard'}
+          </p>
+          <p className="truncate text-sm font-semibold text-slate-700">
+            {dashboard?.title || dashboard?.filename || (isComparison ? 'Project Health Dashboard' : 'Predictive Dashboard')}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {exportError && <span className="max-w-xs text-right text-xs font-medium text-red-600">{exportError}</span>}
+          <button
+            onClick={handleExportPdf}
+            disabled={isExportingPdf}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md disabled:opacity-50"
+          >
+            {isExportingPdf ? (
+              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
+            {i18n.language?.startsWith('da') ? 'Eksporter PDF' : 'Export PDF'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 
@@ -376,24 +203,20 @@ const PublicDashboardShare = () => {
   if (!isDashboardHtml) {
     return (
       <main className="min-h-screen bg-slate-50">
-        <div className="border-b border-slate-200 bg-white/95 px-6 py-3">
-          <div className="mx-auto flex max-w-7xl items-center justify-end">
-            {exportButton}
-          </div>
-        </div>
+        {topBar}
         <div className="mx-auto max-w-7xl p-6" dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
       </main>
     );
   }
 
   return (
-    <div className="h-screen w-screen bg-slate-50">
+    <div className="h-screen w-screen bg-slate-50 flex flex-col">
+      {topBar}
       <iframe
-        ref={iframeRef}
-        srcDoc={embeddedDashboardHtml}
+        srcDoc={html}
         title={isComparison ? 'Shared Project Health Dashboard' : 'Shared Predictive Dashboard'}
         sandbox={isComparison ? 'allow-scripts' : 'allow-scripts allow-same-origin'}
-        style={{ width: '100vw', height: '100vh', border: 'none', display: 'block' }}
+        style={{ width: '100%', height: '100%', border: 'none', display: 'block', flex: 1 }}
       />
     </div>
   );

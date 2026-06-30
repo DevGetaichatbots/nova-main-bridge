@@ -90,10 +90,8 @@ assert.match(publicShare, /sandbox=\{isComparison \? 'allow-scripts' : 'allow-sc
 assert.match(publicShare, /exportDashboardPdfViaServer/, "public share view should reuse the existing server-side dashboard PDF exporter");
 assert.match(publicShare, /normalizePredictiveDashboardHtml/, "public share view should normalize predictive dashboard HTML for export");
 assert.match(publicShare, /Export PDF|Eksporter PDF/, "public share view should expose an export PDF action");
-assert.match(publicShare, /postMessage/, "public share iframe should bridge export button clicks back to the parent page");
-assert.match(publicShare, /nova-shared-export-button/, "public share iframe should inject an in-dashboard export button");
-assert.doesNotMatch(publicShare, /pointer-events-none absolute right-6 top-6/, "public share view should not float the export button over the dashboard");
-assert.doesNotMatch(publicShare, /sticky top-0 z-10/, "public share plain HTML view should not pin the export bar while scrolling");
+assert.match(publicShare, /Shared Dashboard|Delt Dashboard/, "public share view should render a small shared-page top bar");
+assert.match(publicShare, /sticky top-0 z-20/, "public share view should keep the top bar visible while scrolling");
 assert.doesNotMatch(publicShare, /Navbar|ScheduleAnalysisSidebar|ProtectedRoute|ChatWidget/, "public share view should not render app chrome or history");
 
 const exportPdf = read("src/utils/exportPdf.js");
