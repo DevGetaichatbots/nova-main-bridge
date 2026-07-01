@@ -198,8 +198,8 @@ const Navbar = ({ setUser: setAppUser }) => {
         background: "#ffffff",
       }}
     >
-      <div className="relative max-w-screen-2xl w-full mx-auto px-6">
-        <div className="relative flex items-center justify-between h-14">
+      <div className="w-full px-6">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center h-14">
           {/* Logo Section - Logo Only */}
           <Link to={homeRoute} className="group flex items-center flex-shrink-0">
             <div className="relative transition-all duration-300 group-hover:scale-105">
@@ -212,7 +212,7 @@ const Navbar = ({ setUser: setAppUser }) => {
           </Link>
 
           {/* Desktop Navigation — centered */}
-          <div className="hidden lg:flex items-center space-x-1 absolute left-1/2 -translate-x-1/2">
+          <div className="hidden lg:flex items-center justify-center space-x-1">
             {/* Home Link */}
             {!restrictedSubdomain && (
               <Link
@@ -432,8 +432,9 @@ const Navbar = ({ setUser: setAppUser }) => {
             )}
           </div>
 
-          {/* Right side — language + auth */}
-          <div className="hidden lg:flex items-center space-x-2 flex-shrink-0">
+          {/* Right side — language + auth + mobile button */}
+          <div className="flex items-center gap-2 col-start-3">
+          <div className="hidden lg:flex items-center space-x-2">
             {/* Language Switcher */}
             <LanguageSwitcher />
 
@@ -625,6 +626,7 @@ const Navbar = ({ setUser: setAppUser }) => {
               ></span>
             </div>
           </button>
+          </div>
         </div>
 
         {/* Mobile Menu — fixed overlay via portal */}
