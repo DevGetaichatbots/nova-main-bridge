@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next';
 import DOMPurify from 'dompurify';
 import { scheduleService } from '../services/scheduleService';
-import { localizePredictiveReportHtml, normalizePredictiveDashboardHtml } from '../utils/reportLocalization';
+import { localizePredictiveReportHtml } from '../utils/reportLocalization';
 import { exportDashboardPdfViaServer } from '../utils/exportPdf';
 import { buildDashboardShareUrl, copyTextToClipboard } from '../utils/shareLinks';
 import AnalysisPageShell from './AnalysisPageShell';
@@ -362,6 +362,7 @@ const ScheduleAnalysis = () => {
             processing_time: data.processing_time_seconds,
             model: data.predictive_model,
             reference_date: data.reference_date,
+            language: data.language || lang,
           };
           analysisCacheRef.current[activeAnalysisId] = updated;
           return updated;
@@ -661,7 +662,10 @@ const ScheduleAnalysis = () => {
   };
 
   const isDashboardHtml = useCallback((html) => {
-    return typeof html === 'string' && html.includes('window.__pdData');
+    return typeof html === 'string' && (
+      html.includes('window.__novaV1Data') ||
+      html.includes('window.__pdData')
+    );
   }, []);
 
   // Memoized DOMPurify sanitization — only for legacy (non-dashboard) report HTML
@@ -720,7 +724,7 @@ const ScheduleAnalysis = () => {
                 setError(null);
                 try {
                   await exportDashboardPdfViaServer(
-                    normalizePredictiveDashboardHtml(activeAnalysis.predictive_insights, i18n.language),
+                    activeAnalysis.predictive_insights,
                     (activeAnalysis.filename || 'dashboard').replace(/\.[^.]+$/, '') + '.pdf',
                   );
                 } catch (e) {

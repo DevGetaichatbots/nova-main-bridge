@@ -68,7 +68,7 @@ assert.match(scheduleAnalysis, /onShareAnalysis=\{handleShareAnalysis\}/, "Sched
 assert.match(scheduleAnalysis, /<AnalysisPageShell/, "ScheduleAnalysis should use the shared analysis shell");
 assert.match(scheduleAnalysis, /exportDashboardPdfViaServer/, "ScheduleAnalysis should use the server-side dashboard PDF exporter");
 assert.doesNotMatch(scheduleAnalysis, /exportDashboardPdf\(/, "ScheduleAnalysis should not use the custom structured predictive PDF exporter");
-assert.match(scheduleAnalysis, /exportDashboardPdfViaServer\(\s*normalizePredictiveDashboardHtml/, "ScheduleAnalysis should normalize dashboard HTML only for PDF export");
+assert.match(scheduleAnalysis, /exportDashboardPdfViaServer\(\s*activeAnalysis\.predictive_insights/, "ScheduleAnalysis should export the raw dashboard HTML returned by the API");
 assert.match(scheduleAnalysis, /srcDoc=\{activeAnalysis\.predictive_insights\}/, "ScheduleAnalysis should render the original dashboard HTML in the iframe");
 
 const scheduleService = read("src/services/scheduleService.js");

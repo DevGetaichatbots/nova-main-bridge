@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { chatService } from '../services/chatService';
 import { comparisonService } from '../services/comparisonService';
-import { localizeComparisonDashboardHtml } from '../utils/reportLocalization';
 import { exportDashboardPdfViaServer } from '../utils/exportPdf';
 import { buildDashboardShareUrl, copyTextToClipboard } from '../utils/shareLinks';
 import FileComparisonModal from './FileComparisonModal';
@@ -216,7 +215,7 @@ const ComparisonAnalysis = ({ user }) => {
   const renderDashboard = () => (
     <iframe
       ref={iframeRef}
-      srcDoc={localizeComparisonDashboardHtml(activeComparison.dashboard_html, i18n.language)}
+      srcDoc={activeComparison.dashboard_html}
       sandbox="allow-scripts"
       style={{ width: '100%', minHeight: '100vh', border: 'none', display: 'block' }}
       onLoad={handleIframeLoad}
@@ -344,9 +343,8 @@ const ComparisonAnalysis = ({ user }) => {
                 setIsExportingPdf(true);
                 setError(null);
                 try {
-                  const html = localizeComparisonDashboardHtml(activeComparison.dashboard_html, i18n.language);
                   await exportDashboardPdfViaServer(
-                    html,
+                    activeComparison.dashboard_html,
                     (activeComparison.title || 'health-dashboard') + '.pdf',
                   );
                 } catch (e) {

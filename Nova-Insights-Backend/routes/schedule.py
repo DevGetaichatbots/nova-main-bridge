@@ -19,7 +19,20 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 schedule_bp = Blueprint('schedule', __name__)
 
 AGENT_BASE_URL = "https://nova-ai-backend-dga5ffaudzceb0hr.japanwest-01.azurewebsites.net"
+SHARED_PROGRESS_PATH = "/predictive/progress"
 
+
+def _schedule_mime_type(filename):
+    fn_lower = (filename or '').lower()
+    if fn_lower.endswith('.csv'):
+        return 'text/csv'
+    if fn_lower.endswith('.xlsx'):
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    if fn_lower.endswith('.mpp'):
+        return 'application/vnd.ms-project'
+    if fn_lower.endswith('.xml'):
+        return 'application/xml'
+    return 'application/pdf'
 
 def _localize_analysis_payload(analysis, language=None):
     if not analysis:
@@ -480,7 +493,7 @@ def get_analysis_progress(analysis_id):
 
     try:
         resp = http_requests.get(
-            f"{AGENT_BASE_URL}/predictive/progress/{analysis_id}",
+            f"{AGENT_BASE_URL}{SHARED_PROGRESS_PATH}/{analysis_id}",
             timeout=10,
             verify=False,
         )
@@ -548,20 +561,9 @@ def upload_and_analyze(analysis_id):
     print(f"📊 Proxying schedule analysis to Azure agent: {filename} ({file_size} bytes)")
 
     try:
-        schedule_file.seek(0)
-        fn_lower = filename.lower()
-        if fn_lower.endswith('.csv'):
-            mime_type = 'text/csv'
-        elif fn_lower.endswith('.xlsx'):
-            mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        elif fn_lower.endswith('.mpp'):
-            mime_type = 'application/vnd.ms-project'
-        elif fn_lower.endswith('.xml'):
-            mime_type = 'application/xml'
-        else:
-            mime_type = 'application/pdf'
+        mime_type = _schedule_mime_type(filename)
         resp = http_requests.post(
-            f"{AGENT_BASE_URL}/predictive/dashboard",
+            f"{AGENT_BASE_URL}/version-1.0/predictive",
             files={'schedule': (filename, file_data, mime_type)},
             data={'language': language, 'format': fmt, 'analysis_id': analysis_id, 'data_format': data_format},
             timeout=550,
@@ -577,10 +579,7 @@ def upload_and_analyze(analysis_id):
         try:
             if resp.status_code == 200:
                 result = resp.json()
-                predictive_insights = localize_predictive_report_html(
-                    result.get('response', ''),
-                    language,
-                )
+                predictive_insights = result.get('response', '')
                 processing_time = result.get('processing_time_seconds')
                 model = result.get('predictive_model', '')
                 reference_date = result.get('reference_date', '')
@@ -709,22 +708,12 @@ def v2_upload_and_analyze(analysis_id):
     print(f"📊 [v2/NUSF] Submitting predictive job: {filename} ({file_size} bytes)")
 
     try:
-        fn_lower = filename.lower()
-        if fn_lower.endswith('.csv'):
-            mime_type = 'text/csv'
-        elif fn_lower.endswith('.xlsx'):
-            mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        elif fn_lower.endswith('.mpp'):
-            mime_type = 'application/vnd.ms-project'
-        elif fn_lower.endswith('.xml'):
-            mime_type = 'application/xml'
-        else:
-            mime_type = 'application/pdf'
+        mime_type = _schedule_mime_type(filename)
         resp = http_requests.post(
-            f"{AGENT_BASE_URL}/v2/predictive",
+            f"{AGENT_BASE_URL}/version-1.0/predictive",
             files={'schedule': (filename, file_data, mime_type)},
             data={'language': language, 'format': fmt, 'analysis_id': analysis_id, 'data_format': data_format},
-            timeout=60,
+            timeout=550,
             verify=False,
         )
 
@@ -779,7 +768,7 @@ def v2_get_analysis_progress(analysis_id):
 
     try:
         resp = http_requests.get(
-            f"{AGENT_BASE_URL}/v2/predictive/progress/{analysis_id}",
+            f"{AGENT_BASE_URL}{SHARED_PROGRESS_PATH}/{analysis_id}",
             timeout=10,
             verify=False,
         )
@@ -791,10 +780,7 @@ def v2_get_analysis_progress(analysis_id):
 
         if data.get('stage') == 'complete':
             result = data.get('result', {})
-            predictive_insights = localize_predictive_report_html(
-                result.get('predictive_insights', ''),
-                data.get('language') or request.args.get('language') or 'en',
-            )
+            predictive_insights = result.get('predictive_insights', '')
             if predictive_insights:
                 conn = get_db_connection()
                 if conn:
@@ -1126,6 +1112,8 @@ def generate_comparison(comparison_id):
     new_filename = data.get('new_filename', 'New Schedule')
     language = data.get('language', 'en')
     use_nusf = data.get('use_nusf', False)
+    scope_filter = data.get('scope_filter')
+    reference_date = data.get('reference_date')
 
     import time as _time
     start = _time.time()
@@ -1157,25 +1145,30 @@ def generate_comparison(comparison_id):
         conn.close()
 
     try:
+        agent_payload = {
+            'session_id': session_id,
+            'old_session_id': old_session_id,
+            'new_session_id': new_session_id,
+            'language': language,
+            'format': 'html',
+            'analysis_id': comparison_id,
+        }
+        if scope_filter:
+            agent_payload['scope_filter'] = scope_filter
+        if reference_date:
+            agent_payload['reference_date'] = reference_date
+        if use_nusf:
+            agent_payload['data_format'] = 'nusf'
+
         agent_resp = http_requests.post(
-            f"{AGENT_BASE_URL}/v5-graph/compare",
-            data={
-                'session_id': session_id,
-                'old_session_id': old_session_id,
-                'new_session_id': new_session_id,
-                'language': language,
-                'format': 'html',
-                'analysis_id': comparison_id,
-            },
+            f"{AGENT_BASE_URL}/version-1.0/health",
+            data=agent_payload,
             timeout=300,
             verify=False,
         )
         agent_resp.raise_for_status()
         payload = agent_resp.json()
-        dashboard_html = localize_comparison_dashboard_html(
-            payload.get('response', ''),
-            language,
-        )
+        dashboard_html = payload.get('response', '')
         elapsed = _time.time() - start
 
         conn = get_db_connection()

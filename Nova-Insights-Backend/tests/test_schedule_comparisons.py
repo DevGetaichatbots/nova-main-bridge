@@ -153,7 +153,7 @@ class ScheduleComparisonTests(unittest.TestCase):
         self.assertTrue(conn.committed)
         self.assertTrue(conn.closed)
 
-    def test_generate_comparison_calls_v5_graph_and_persists_dashboard(self):
+    def test_generate_comparison_calls_versioned_health_and_persists_dashboard(self):
         schedule.request._json = {
             "session_id": "session_1",
             "old_session_id": "old_1",
@@ -174,14 +174,16 @@ class ScheduleComparisonTests(unittest.TestCase):
         self.assertEqual(result["success"], True)
         self.assertEqual(result["comparison_id"], "cmp_123")
         post.assert_called_once()
+        self.assertTrue(post.call_args.args[0].endswith("/version-1.0/health"))
         self.assertEqual(post.call_args.kwargs["data"]["analysis_id"], "cmp_123")
         self.assertEqual(post.call_args.kwargs["data"]["format"], "html")
+        self.assertEqual(post.call_args.kwargs["data"]["data_format"], "nusf")
         self.assertIn("status='processing'", first_conn.cursor_obj.executed[0][0])
         self.assertIn(True, first_conn.cursor_obj.executed[0][1])
         self.assertIn("dashboard_html=%s", second_conn.cursor_obj.executed[0][0])
         saved_dashboard_html = second_conn.cursor_obj.executed[0][1][0]
-        self.assertIn("Sammenligningsresultater", saved_dashboard_html)
-        self.assertIn("Projektsundhed", saved_dashboard_html)
+        self.assertIn("Comparison Results", saved_dashboard_html)
+        self.assertIn("Project Health", saved_dashboard_html)
         self.assertTrue(first_conn.committed)
         self.assertTrue(second_conn.committed)
 
