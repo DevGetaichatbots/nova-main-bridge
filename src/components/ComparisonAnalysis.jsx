@@ -146,7 +146,13 @@ const ComparisonAnalysis = ({ user }) => {
     setShowUploadModal(true);
   };
 
-  const handleFilesUploaded = async ({ oldSessionId, newSessionId, oldFileName, newFileName, useNusf }) => {
+  const handleFilesUploaded = async ({
+    oldSessionId,
+    newSessionId,
+    oldFileName,
+    newFileName,
+    generationLanguage,
+  }) => {
     if (!activeComparisonId || !uploadSessionId) return;
     setShowUploadModal(false);
     setIsProcessing(true);
@@ -159,8 +165,8 @@ const ComparisonAnalysis = ({ user }) => {
         newSessionId,
         oldFilename: oldFileName,
         newFilename: newFileName,
-        useNusf: useNusf,
-        language: i18n.language?.substring(0, 2) || 'en',
+        useNusf: true,
+        language: generationLanguage || 'en',
       });
 
       const data = await comparisonService.getComparison(activeComparisonId);

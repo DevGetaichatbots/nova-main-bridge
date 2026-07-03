@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
-import ProgressModal from "./ProgressModal";
-import NusfToggle from "./NusfToggle";
 import { chatService } from "../services/chatService";
 import { getApiBaseUrl } from "../utils/apiConfig.js";
 import { handleApiError } from "../utils/errorHandler";
@@ -26,6 +24,7 @@ const ALLOWED_FILE_TYPES = [
 const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.txt', '.csv', '.xlsx', '.mpp', '.xml'];
 
 const MAX_CSV_ROWS = 3000;
+const DASHBOARD_LANGUAGES = ['en', 'da'];
 
 const countCsvRows = (text) => {
   const lines = text.split('\n').filter(line => line.trim().length > 0);
@@ -79,10 +78,10 @@ const FileComparisonModal = ({
   const [fileErrors, setFileErrors] = useState({ old: "", new: "" });
   const [isDragging, setIsDragging] = useState({ old: false, new: false });
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("");
   const [uploadProgressData, setUploadProgressData] = useState(null);
-  const [useNusf, setUseNusf] = useState(false);
+  const [generationLanguage, setGenerationLanguage] = useState(() => (
+    i18n.language?.startsWith('da') ? 'da' : 'en'
+  ));
   const cancelPollRef = React.useRef(null);
 
   const isFilePdfOrCsv = (file) => {
@@ -91,14 +90,8 @@ const FileComparisonModal = ({
     return name.endsWith('.pdf') || name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.mpp') || name.endsWith('.xml');
   };
 
-  const showNusfToggle = oldScheduleFile && newScheduleFile
+  const canUseNusfPipeline = oldScheduleFile && newScheduleFile
     && isFilePdfOrCsv(oldScheduleFile) && isFilePdfOrCsv(newScheduleFile);
-
-  useEffect(() => {
-    if (!showNusfToggle && useNusf) {
-      setUseNusf(false);
-    }
-  }, [showNusfToggle]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -108,13 +101,11 @@ const FileComparisonModal = ({
       setError("");
       setFileErrors({ old: "", new: "" });
       setIsUploading(false);
-      setUploadProgress(0);
-      setProgressMessage("");
       setUploadProgressData(null);
       setIsDragging({ old: false, new: false });
-      setUseNusf(false);
+      setGenerationLanguage(i18n.language?.startsWith('da') ? 'da' : 'en');
     }
-  }, [isOpen]);
+  }, [i18n.language, isOpen]);
 
   const handleFileChange = async (e, fileSlot) => {
     const files = Array.from(e.target.files);
@@ -251,7 +242,8 @@ const FileComparisonModal = ({
                 newFileName: newScheduleFile.name,
                 oldSessionId: uploadResult.oldSessionId,
                 newSessionId: uploadResult.newSessionId,
-                useNusf,
+                useNusf: true,
+                generationLanguage,
               });
             }
             resolve();
@@ -271,7 +263,7 @@ const FileComparisonModal = ({
         }));
       };
 
-      if (useNusf && showNusfToggle) {
+      if (canUseNusfPipeline) {
         const v2Result = await chatService.uploadFilesV2(oldScheduleFile, newScheduleFile, sessionId);
 
         const cancelPoll = chatService.pollV2UploadProgress(
@@ -339,10 +331,9 @@ const FileComparisonModal = ({
       const isDanish = i18n.language?.startsWith('da');
       let userErrorMessage = error.message || t('fileComparison.uploadFailedRetry');
       if (userErrorMessage.includes('NUSF_V2_UNAVAILABLE')) {
-        setUseNusf(false);
         userErrorMessage = isDanish
-          ? 'NUSF v2-pipeline er endnu ikke tilgængelig. Skifte tilbage til standardprocessen — prøv igen.'
-          : 'The NUSF v2 pipeline is not yet available. Switched back to the standard pipeline — please try again.';
+          ? 'NUSF v2-pipeline er endnu ikke tilgængelig. Prøv venligst igen senere.'
+          : 'The NUSF v2 pipeline is not yet available. Please try again later.';
       } else if (userErrorMessage.includes('context length') || userErrorMessage.includes('token')) {
         userErrorMessage = isDanish
           ? 'Filerne er for store til at behandle. Prøv venligst med mindre filer eller kontakt support.'
@@ -824,17 +815,47 @@ const FileComparisonModal = ({
                     </div>
                   </div>
 
-                  {showNusfToggle && (
-                    <div
-                      className="px-4 py-3 rounded-xl border"
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.7)",
-                        borderColor: "rgba(0, 214, 214, 0.2)",
-                      }}
-                    >
-                      <NusfToggle enabled={useNusf} onChange={setUseNusf} />
+                  <div
+                    className="px-4 py-3 rounded-xl border"
+                    style={{
+                      backgroundColor: "rgba(255, 255, 255, 0.7)",
+                      borderColor: "rgba(0, 214, 214, 0.2)",
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div>
+                        <p className="text-sm font-semibold" style={{ color: "#1c2631" }}>
+                          {i18n.language?.startsWith('da') ? 'Dashboardsprog' : 'Dashboard language'}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: "#64748b" }}>
+                          {i18n.language?.startsWith('da')
+                            ? 'Dette valg bruges kun til den genererede rapport.'
+                            : 'This only affects the generated dashboard.'}
+                        </p>
+                      </div>
+                      <div className="inline-flex rounded-xl p-1 border" style={{ borderColor: "rgba(0, 214, 214, 0.2)", backgroundColor: "rgba(240, 249, 255, 0.9)" }}>
+                        {DASHBOARD_LANGUAGES.map((language) => {
+                          const isActive = generationLanguage === language;
+                          const label = language === 'da' ? 'Dansk' : 'English';
+                          return (
+                            <button
+                              key={language}
+                              type="button"
+                              onClick={() => setGenerationLanguage(language)}
+                              className="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200"
+                              style={{
+                                color: isActive ? "#ffffff" : "#1c2631",
+                                background: isActive ? "linear-gradient(135deg, #1eb5ee, #00b8b8)" : "transparent",
+                                boxShadow: isActive ? "0 8px 20px rgba(30, 181, 238, 0.22)" : "none",
+                              }}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>

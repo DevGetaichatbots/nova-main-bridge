@@ -38,12 +38,15 @@ assert.match(component, /<iframe[\s\S]*srcDoc=/, "ComparisonAnalysis should rend
 assert.match(component, /sandbox="allow-scripts"/, "ComparisonAnalysis iframe should allow scripts without same-origin");
 assert.doesNotMatch(component, /Use Classic Analysis|Brug Klassisk Analyse|useClassic|setUseClassic|<ChatWidget/, "ComparisonAnalysis should not expose the classic analysis toggle");
 assert.match(component, /<FileComparisonModal/, "ComparisonAnalysis should reuse FileComparisonModal");
-assert.match(component, /useNusf:\s*useNusf/, "ComparisonAnalysis should forward NUSF selection to dashboard generation");
+assert.match(component, /useNusf:\s*true/, "ComparisonAnalysis should always enable NUSF for dashboard generation");
+assert.match(component, /language:\s*generationLanguage\s*\|\|\s*'en'/, "ComparisonAnalysis should forward the modal-selected dashboard language");
 assert.match(component, /<AnalysisPageShell/, "ComparisonAnalysis should use the shared analysis shell");
 assert.doesNotMatch(component, /className="flex-1 overflow-y-auto bg-slate-50"/, "ComparisonAnalysis should not wrap full-page chat in an extra scroll container");
 
 const uploadModal = read("src/components/FileComparisonModal.jsx");
-assert.match(uploadModal, /useNusf,\s*\n\s*\}\);/, "FileComparisonModal should include useNusf in onFilesUploaded payload");
+assert.doesNotMatch(uploadModal, /<NusfToggle|enabled=\{useNusf\}/, "FileComparisonModal should not render the old NUSF toggle");
+assert.match(uploadModal, /useNusf:\s*true,/, "FileComparisonModal should keep NUSF enabled by default");
+assert.match(uploadModal, /generationLanguage,/, "FileComparisonModal should include the selected dashboard language in the upload payload");
 
 const app = read("src/App.jsx");
 assert.match(app, /ComparisonAnalysis/, "App should import/lazy-load ComparisonAnalysis");
@@ -70,6 +73,8 @@ assert.match(scheduleAnalysis, /exportDashboardPdfViaServer/, "ScheduleAnalysis 
 assert.doesNotMatch(scheduleAnalysis, /exportDashboardPdf\(/, "ScheduleAnalysis should not use the custom structured predictive PDF exporter");
 assert.match(scheduleAnalysis, /exportDashboardPdfViaServer\(\s*activeAnalysis\.predictive_insights/, "ScheduleAnalysis should export the raw dashboard HTML returned by the API");
 assert.match(scheduleAnalysis, /srcDoc=\{activeAnalysis\.predictive_insights\}/, "ScheduleAnalysis should render the original dashboard HTML in the iframe");
+assert.match(scheduleAnalysis, /const dataFormat = 'nusf';/, "ScheduleAnalysis should keep NUSF uploads enabled by default");
+assert.match(scheduleAnalysis, /const lang = generationLanguage \|\| 'en';/, "ScheduleAnalysis should use the local generation-language toggle for dashboard creation");
 
 const scheduleService = read("src/services/scheduleService.js");
 assert.doesNotMatch(scheduleService, /\/api\/schedule\/export-pdf/, "scheduleService should not call the PDFShift-backed export endpoint");

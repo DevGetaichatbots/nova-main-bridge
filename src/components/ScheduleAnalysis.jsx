@@ -24,6 +24,7 @@ const SCHEDULE_NAV_SECTIONS = [
   { id: 'predictive-resource-assessment',   labelEn: 'Resource Assessment',    labelDa: 'Ressourcevurdering' },
   { id: 'predictive-forcing-assessment',    labelEn: 'Forcing Assessment',     labelDa: 'Forceringsmuligheder' },
 ];
+const DASHBOARD_LANGUAGES = ['en', 'da'];
 
 const ScheduleAnalysis = () => {
   const { t, i18n } = useTranslation();
@@ -44,6 +45,9 @@ const ScheduleAnalysis = () => {
   const [navSections, setNavSections] = useState([]);
   const [activeSectionId, setActiveSectionId] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
+  const [generationLanguage, setGenerationLanguage] = useState(() => (
+    i18n.language?.startsWith('da') ? 'da' : 'en'
+  ));
   const fileInputRef = useRef(null);
   const progressPollRef = useRef(null);
   const dashboardIframeRef = useRef(null);
@@ -72,6 +76,7 @@ const ScheduleAnalysis = () => {
 
   useEffect(() => {
     setPendingFile(null);
+    setGenerationLanguage(i18n.language?.startsWith('da') ? 'da' : 'en');
     if (!activeAnalysisId) {
       setActiveAnalysis(null);
       setIsLoadingAnalysis(false);
@@ -101,7 +106,7 @@ const ScheduleAnalysis = () => {
       }
     };
     loadAnalysis();
-  }, [activeAnalysisId]);
+  }, [activeAnalysisId, i18n.language]);
 
   useEffect(() => {
     if (!isProcessing || !activeAnalysisId) {
@@ -345,7 +350,7 @@ const ScheduleAnalysis = () => {
     setProgressData({ stage: 'received', message: t('scheduleAnalysis.progress.received'), step: 0, total_steps: 6 });
 
     try {
-      const lang = i18n.language?.substring(0, 2) || 'en';
+      const lang = generationLanguage || 'en';
       const dataFormat = 'nusf';
 
       const data = await scheduleService.uploadAndAnalyze(activeAnalysisId, file, lang, dataFormat);
@@ -515,6 +520,40 @@ const ScheduleAnalysis = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  {i18n.language?.startsWith('da') ? 'Dashboardsprog' : 'Dashboard language'}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {i18n.language?.startsWith('da')
+                    ? 'Dette valg styrer kun den genererede rapport.'
+                    : 'This only controls the generated dashboard.'}
+                </p>
+              </div>
+              <div className="inline-flex rounded-xl p-1 border border-slate-200 bg-slate-50">
+                {DASHBOARD_LANGUAGES.map((language) => {
+                  const isActive = generationLanguage === language;
+                  const label = language === 'da' ? 'Dansk' : 'English';
+                  return (
+                    <button
+                      key={language}
+                      type="button"
+                      onClick={() => setGenerationLanguage(language)}
+                      className="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+                      style={{
+                        color: isActive ? '#ffffff' : '#1e293b',
+                        background: isActive ? 'linear-gradient(135deg, #1eb5ee, #00B4B4)' : 'transparent',
+                        boxShadow: isActive ? '0 8px 20px rgba(30, 181, 238, 0.22)' : 'none',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <button
