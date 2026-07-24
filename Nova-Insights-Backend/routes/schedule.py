@@ -10,7 +10,6 @@ from utils.report_localization import (
 )
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
-import os
 import secrets
 import json
 import requests as http_requests
@@ -19,7 +18,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 schedule_bp = Blueprint('schedule', __name__)
 
-AGENT_BASE_URL = os.getenv('AGENT_BASE_URL', 'https://nova-ai-backend-dga5ffaudzceb0hr.japanwest-01.azurewebsites.net')
+AGENT_BASE_URL = "https://nova-ai-backend-dga5ffaudzceb0hr.japanwest-01.azurewebsites.net"
 SHARED_PROGRESS_PATH = "/predictive/progress"
 
 
@@ -1162,7 +1161,7 @@ def generate_comparison(comparison_id):
             agent_payload['data_format'] = 'nusf'
 
         agent_resp = http_requests.post(
-            f"{AGENT_BASE_URL}/version-1.1/health",
+            f"{AGENT_BASE_URL}/version-1.0/health",
             data=agent_payload,
             timeout=300,
             verify=False,

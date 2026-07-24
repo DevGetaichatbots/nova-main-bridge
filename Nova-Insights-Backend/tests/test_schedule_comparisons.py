@@ -174,7 +174,7 @@ class ScheduleComparisonTests(unittest.TestCase):
         self.assertEqual(result["success"], True)
         self.assertEqual(result["comparison_id"], "cmp_123")
         post.assert_called_once()
-        self.assertTrue(post.call_args.args[0].endswith("/version-1.1/health"))
+        self.assertTrue(post.call_args.args[0].endswith("/version-1.0/health"))
         self.assertEqual(post.call_args.kwargs["data"]["analysis_id"], "cmp_123")
         self.assertEqual(post.call_args.kwargs["data"]["format"], "html")
         self.assertEqual(post.call_args.kwargs["data"]["data_format"], "nusf")
