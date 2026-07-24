@@ -1195,6 +1195,15 @@ def generate_comparison(comparison_id):
         })
 
     except Exception as e:
+        error_detail = str(e)
+        agent_resp_local = locals().get('agent_resp')
+        if agent_resp_local is not None:
+            try:
+                error_detail = f"{error_detail} | agent response: {agent_resp_local.text[:500]}"
+            except Exception:
+                pass
+        print(f"Error generating comparison {comparison_id}: {error_detail}")
+
         conn = get_db_connection()
         if conn:
             try:
@@ -1207,3 +1216,5 @@ def generate_comparison(comparison_id):
                     conn.commit()
             finally:
                 conn.close()
+
+        return jsonify({'success': False, 'error': error_detail}), 500
