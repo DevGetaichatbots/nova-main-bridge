@@ -47,10 +47,12 @@ class ChatService {
       formData.append("new_session_id", newSessionId);
       formData.append("new_schedule", newScheduleFile);
 
+      const token = localStorage.getItem("accessToken");
       const response = await fetch(uploadUrl, {
         method: "POST",
         body: formData,
         credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
 
       if (!response.ok) {
@@ -101,7 +103,11 @@ class ChatService {
     const poll = async () => {
       if (stopped) return;
       try {
-        const res = await fetch(PROGRESS_URL, { credentials: "include" });
+        const token = localStorage.getItem("accessToken");
+        const res = await fetch(PROGRESS_URL, {
+          credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         console.log(`📊 Poll [${attempts + 1}]:`, JSON.stringify(data));
@@ -409,10 +415,12 @@ class ChatService {
 
     console.log("📤 [v2/NUSF] Uploading files via v2 proxy...");
 
+    const token = localStorage.getItem("accessToken");
     const response = await fetch(uploadUrl, {
       method: "POST",
       body: formData,
       credentials: "include",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
 
     if (!response.ok) {
@@ -443,7 +451,11 @@ class ChatService {
     const poll = async () => {
       if (stopped) return;
       try {
-        const res = await fetch(PROGRESS_URL, { credentials: "include" });
+        const token = localStorage.getItem("accessToken");
+        const res = await fetch(PROGRESS_URL, {
+          credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         console.log(
