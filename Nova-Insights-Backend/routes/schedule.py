@@ -1161,7 +1161,7 @@ def generate_comparison(comparison_id):
             agent_payload['data_format'] = 'nusf'
 
         agent_resp = http_requests.post(
-            f"{AGENT_BASE_URL}/version-1.0/health",
+            f"{AGENT_BASE_URL}/version-1.0/kemp/health",
             data=agent_payload,
             timeout=300,
             verify=False,
