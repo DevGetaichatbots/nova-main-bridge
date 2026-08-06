@@ -274,7 +274,7 @@ const ComparisonAnalysis = ({ user }) => {
         <p className="text-slate-500 mb-6">
           {i18n.language?.startsWith('da')
             ? 'Upload to tidsplaner for automatisk at generere v5-grafdashboardet.'
-            : 'Upload two schedules to generate the v5 graph dashboard automatically.'}
+            : 'Upload two schedules to generate the analysis dashboard automatically.'}
         </p>
         <button
           onClick={handleNewComparison}
