@@ -23,10 +23,12 @@ export const comparisonService = {
     return parseJson(response, 'Failed to fetch comparisons');
   },
 
-  async createComparison(comparisonId, title) {
+  async createComparison(comparisonId, title, { oldFilename = '', newFilename = '' } = {}) {
     const response = await postWithAuth('/api/schedule/comparisons', {
       comparison_id: comparisonId,
       title,
+      old_filename: oldFilename,
+      new_filename: newFilename,
     });
     return parseJson(response, 'Failed to create comparison');
   },

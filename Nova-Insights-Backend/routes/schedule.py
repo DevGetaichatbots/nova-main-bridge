@@ -857,6 +857,8 @@ def create_comparison():
     data = request.get_json() or {}
     comparison_id = data.get('comparison_id') or f"cmp_{secrets.token_hex(8)}"
     title = data.get('title', 'New Comparison')
+    old_filename = (data.get('old_filename') or '').strip()
+    new_filename = (data.get('new_filename') or '').strip()
 
     conn = get_db_connection()
     if not conn:
@@ -870,14 +872,28 @@ def create_comparison():
             """, (comparison_id, user['user_id']))
             existing = cur.fetchone()
             if existing:
+                if old_filename or new_filename:
+                    cur.execute("""
+                        UPDATE schedule_comparisons
+                        SET old_filename = COALESCE(NULLIF(%s, ''), old_filename),
+                            new_filename = COALESCE(NULLIF(%s, ''), new_filename),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE comparison_id = %s AND user_id = %s
+                    """, (old_filename, new_filename, comparison_id, user['user_id']))
+                    conn.commit()
+                    cur.execute("""
+                        SELECT * FROM schedule_comparisons
+                        WHERE comparison_id = %s AND user_id = %s
+                    """, (comparison_id, user['user_id']))
+                    existing = cur.fetchone()
                 return jsonify({'success': True, 'comparison': existing})
 
             cur.execute("""
                 INSERT INTO schedule_comparisons
-                    (comparison_id, user_id, company_id, title, status)
-                VALUES (%s, %s, %s, %s, 'pending')
+                    (comparison_id, user_id, company_id, title, status, old_filename, new_filename)
+                VALUES (%s, %s, %s, %s, 'pending', NULLIF(%s, ''), NULLIF(%s, ''))
                 RETURNING *
-            """, (comparison_id, user['user_id'], user.get('company_id'), title))
+            """, (comparison_id, user['user_id'], user.get('company_id'), title, old_filename, new_filename))
             comparison = cur.fetchone()
             conn.commit()
 

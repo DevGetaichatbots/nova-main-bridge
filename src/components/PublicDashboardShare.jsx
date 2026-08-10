@@ -123,6 +123,10 @@ const PublicDashboardShare = () => {
     return `${baseName.replace(/\.[^.]+$/, '')}.pdf`;
   }, [dashboard, isComparison]);
 
+  const sourceFilesLabel = isComparison
+    ? [dashboard?.old_filename, dashboard?.new_filename].filter(Boolean).join(' ↔ ')
+    : dashboard?.filename;
+
   const handleExportPdf = async () => {
     if (!exportHtml || isExportingPdf) return;
 
@@ -148,6 +152,14 @@ const PublicDashboardShare = () => {
           <p className="truncate text-sm font-semibold text-slate-700">
             {dashboard?.title || dashboard?.filename || (isComparison ? 'Project Health Dashboard' : 'Predictive Dashboard')}
           </p>
+          {sourceFilesLabel && (
+            <p
+              className="truncate text-xs text-slate-500 mt-0.5"
+              title={sourceFilesLabel}
+            >
+              {sourceFilesLabel}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {exportError && <span className="max-w-xs text-right text-xs font-medium text-red-600">{exportError}</span>}
