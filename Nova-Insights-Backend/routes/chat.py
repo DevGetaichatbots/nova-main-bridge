@@ -5,6 +5,7 @@ from utils.audit_logger import log_audit_event
 from utils.redis_client import cache_get, cache_set, cache_delete
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
+import os
 import secrets
 import json
 import requests as http_requests
@@ -1585,7 +1586,7 @@ def download_session_pdf(session_id):
         conn.close()
 
 
-AGENT_BASE_URL = "https://nova-ai-backend-dga5ffaudzceb0hr.japanwest-01.azurewebsites.net"
+AGENT_BASE_URL = os.getenv('AGENT_BASE_URL', 'https://nova-ai-backend-dga5ffaudzceb0hr.japanwest-01.azurewebsites.net')
 
 @chat_bp.route('/proxy/query', methods=['POST'])
 def proxy_query():
@@ -1654,6 +1655,61 @@ def proxy_query():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def _cache_session_source_files(session_id, user_id, company_id, request_files):
+    """Cache uploaded comparison schedule file bytes in session_source_files table (TL-9.1)."""
+    if not session_id:
+        return
+    old_f = request_files.get('old_schedule')
+    new_f = request_files.get('new_schedule')
+    if not old_f and not new_f:
+        return
+    old_bytes = None
+    new_bytes = None
+    old_fn = None
+    new_fn = None
+    if old_f:
+        old_bytes = old_f.read()
+        old_f.seek(0)
+        old_fn = old_f.filename
+    if new_f:
+        new_bytes = new_f.read()
+        new_f.seek(0)
+        new_fn = new_f.filename
+
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS session_source_files (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(255) UNIQUE NOT NULL,
+                    old_file_data BYTEA,
+                    new_file_data BYTEA,
+                    old_filename VARCHAR(255),
+                    new_filename VARCHAR(255),
+                    company_id INTEGER,
+                    user_id INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                INSERT INTO session_source_files
+                    (session_id, old_file_data, new_file_data, old_filename, new_filename, company_id, user_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (session_id) DO UPDATE
+                SET old_file_data = COALESCE(EXCLUDED.old_file_data, session_source_files.old_file_data),
+                    new_file_data = COALESCE(EXCLUDED.new_file_data, session_source_files.new_file_data),
+                    old_filename = COALESCE(EXCLUDED.old_filename, session_source_files.old_filename),
+                    new_filename = COALESCE(EXCLUDED.new_filename, session_source_files.new_filename);
+            """, (session_id, old_bytes, new_bytes, old_fn, new_fn, company_id, user_id))
+            conn.commit()
+    except Exception as e:
+        print(f"⚠️ Could not cache session source files: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
 @chat_bp.route('/proxy/upload', methods=['POST'])
 def proxy_upload():
     user = get_current_user()
@@ -1669,6 +1725,8 @@ def proxy_upload():
         form_data = {}
         for key in request.form:
             form_data[key] = request.form[key]
+
+        _cache_session_source_files(form_data.get('session_id'), user['user_id'], user.get('company_id'), request.files)
         
         print(f"🔄 Proxying upload to Azure agent with {len(files)} file(s)")
         print(f"📎 File keys: {list(files.keys())}")
@@ -1734,6 +1792,8 @@ def proxy_v2_upload():
         form_data = {}
         for key in request.form:
             form_data[key] = request.form[key]
+
+        _cache_session_source_files(form_data.get('session_id'), user['user_id'], user.get('company_id'), request.files)
 
         print(f"🔄 [v2/NUSF] Proxying upload to Azure agent with {len(files)} file(s)")
         print(f"📎 File keys: {list(files.keys())}")

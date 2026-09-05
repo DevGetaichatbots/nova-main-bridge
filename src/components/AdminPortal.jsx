@@ -5,6 +5,7 @@ import axios from "axios";
 import { getApiBaseUrl } from "../utils/apiConfig";
 import CustomSelect from "./CustomSelect";
 import { nameContainsDigits } from "../utils/nameValidation";
+import TrustCenterPanel from "./TrustCenterPanel";
 
 const AdminPortal = () => {
   const { t } = useTranslation();
@@ -31,6 +32,7 @@ const AdminPortal = () => {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [showPassword, setShowPassword] = useState(false);
+  const [activeTab, setActiveTab] = useState("users"); // "users" | "trust-center"
   
   const addModalRef = useRef(null);
   const editModalRef = useRef(null);
@@ -459,8 +461,43 @@ const AdminPortal = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg border border-[#1eb5ee]/20 overflow-hidden">
-          {/* Header with filters */}
+        {/* Tab Navigation: Users / Trust Center */}
+        <div className="flex items-center gap-6 mb-6 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`pb-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 ${
+              activeTab === "users"
+                ? "border-[#1eb5ee] text-[#1eb5ee]"
+                : "border-transparent text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            {t('admin.users', 'Users')} ({pagination.total || users.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("trust-center")}
+            className={`pb-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 ${
+              activeTab === "trust-center"
+                ? "border-[#1eb5ee] text-[#1eb5ee]"
+                : "border-transparent text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            Trust Center (Brief §43)
+          </button>
+        </div>
+
+        {activeTab === "trust-center" ? (
+          <div className="bg-white rounded-2xl shadow-lg border border-[#1eb5ee]/20 overflow-hidden">
+            <TrustCenterPanel companyId={selectedUser?.company?.name || null} />
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-lg border border-[#1eb5ee]/20 overflow-hidden">
+            {/* Header with filters */}
           <div className="px-6 py-4 border-b border-[#1eb5ee]/20">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <h2 className="text-lg font-semibold text-[#1c2631]">
@@ -775,6 +812,7 @@ const AdminPortal = () => {
             </div>
           )}
         </div>
+      )}
       </div>
 
       {/* Add User Modal */}

@@ -1,0 +1,59 @@
+name: Trust Layer Release Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  release-gates:
+    name: Enforce Brief §36 & §39 Release Gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            rag-agent/backend/requirements.txt
+            ../../../../rag-agent/backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          if [ -d "rag-agent/backend" ]; then
+            cd rag-agent/backend
+          elif [ -d "../../../../rag-agent/backend" ]; then
+            cd ../../../../rag-agent/backend
+          elif [ -d "../rag-agent/backend" ]; then
+            cd ../rag-agent/backend
+          fi
+          pip install -r requirements.txt
+          pip install pytest pytest-subtests httpx
+
+      - name: Run Blocking Release Gates (Brief §36, §39)
+        run: |
+          if [ -d "rag-agent/backend" ]; then
+            cd rag-agent/backend
+          elif [ -d "../../../../rag-agent/backend" ]; then
+            cd ../../../../rag-agent/backend
+          elif [ -d "../rag-agent/backend" ]; then
+            cd ../rag-agent/backend
+          fi
+          PYTHONPATH=. python -m tests.trust.harness compare
+
+      - name: Run Full Trust Test Suite
+        run: |
+          if [ -d "rag-agent/backend" ]; then
+            cd rag-agent/backend
+          elif [ -d "../../../../rag-agent/backend" ]; then
+            cd ../../../../rag-agent/backend
+          elif [ -d "../rag-agent/backend" ]; then
+            cd ../rag-agent/backend
+          fi
+          PYTHONPATH=. pytest tests/trust/ -q

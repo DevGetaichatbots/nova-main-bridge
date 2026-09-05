@@ -7,6 +7,8 @@ import { buildDashboardShareUrl, copyTextToClipboard } from '../utils/shareLinks
 import FileComparisonModal from './FileComparisonModal';
 import AnalysisPageShell from './AnalysisPageShell';
 import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
+import ReviewQueuePanel from './ReviewQueuePanel';
+import SourceViewerModal from './SourceViewerModal';
 
 const Spinner = () => (
   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -32,6 +34,61 @@ const ComparisonAnalysis = ({ user }) => {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [shareFeedback, setShareFeedback] = useState('');
   const iframeRef = useRef(null);
+
+  // TL-8.2: review queue (brief §25/§26) — count surfaced on the report
+  // header, links into the full panel. Rendered in the parent app, never
+  // inside the dashboard's sandboxed iframe.
+  const [reviewQueueCount, setReviewQueueCount] = useState(0);
+  const [showReviewQueue, setShowReviewQueue] = useState(false);
+
+  // TL-9.1: click-into-evidence / source viewer (Brief §24)
+  const [sourceViewerState, setSourceViewerState] = useState({
+    isOpen: false,
+    scheduleRole: 'new',
+    pageNumber: 1,
+    boundingBox: null,
+    filename: '',
+  });
+
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === 'NOVA_VIEW_SOURCE') {
+        const { scheduleRole, pageNumber, boundingBox } = event.data;
+        const filename = scheduleRole === 'old'
+          ? activeComparison?.old_filename
+          : activeComparison?.new_filename;
+        setSourceViewerState({
+          isOpen: true,
+          scheduleRole: scheduleRole || 'new',
+          pageNumber: pageNumber || 1,
+          boundingBox: boundingBox || null,
+          filename: filename || '',
+        });
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [activeComparison]);
+
+  const refreshReviewQueueCount = useCallback(async (comparisonId) => {
+    if (!comparisonId) return;
+    try {
+      const data = await comparisonService.listReviewQueue(comparisonId);
+      if (data.success) {
+        setReviewQueueCount((data.items || []).filter((it) => it.state !== 'resolved').length);
+      }
+    } catch {
+      // Non-fatal — the count badge simply stays at its last known value.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeComparison?.status === 'completed') {
+      refreshReviewQueueCount(activeComparisonId);
+    } else {
+      setReviewQueueCount(0);
+    }
+  }, [activeComparisonId, activeComparison?.status, refreshReviewQueueCount]);
 
   const loadComparisons = useCallback(async () => {
     try {
@@ -159,7 +216,7 @@ const ComparisonAnalysis = ({ user }) => {
     setError(null);
 
     try {
-      await comparisonService.generateDashboard(activeComparisonId, {
+      const generateResult = await comparisonService.generateDashboard(activeComparisonId, {
         sessionId: uploadSessionId,
         oldSessionId,
         newSessionId,
@@ -169,9 +226,35 @@ const ComparisonAnalysis = ({ user }) => {
         language: generationLanguage || 'en',
       });
 
+      // TL-7.8 (brief §42): a BLOCK gating decision (TL-4.6/TL-5.5) is a
+      // protective pause, not a crash. `generateResult` may already carry
+      // `status: 'blocked'` in-band (a 200 response, not a thrown error —
+      // see `TruncationReport.to_refusal_response`/`PreflightReport.
+      // to_refusal_response` in `src/trust/preflight.py`); check it before
+      // trusting the re-fetched comparison record's own `status` field.
+      if (generateResult?.status === 'blocked') {
+        setActiveComparison(prev => ({
+          ...(prev || {}),
+          status: 'blocked',
+          notice: generateResult.notice || null,
+          blockedMessage: generateResult.message || null,
+          blockedReport: generateResult.report || null,
+        }));
+        return;
+      }
+
       const data = await comparisonService.getComparison(activeComparisonId);
       if (data.success) {
-        setActiveComparison(data.comparison);
+        if (data.comparison?.status === 'blocked') {
+          setActiveComparison({
+            ...data.comparison,
+            notice: data.comparison.notice || generateResult?.notice || null,
+            blockedMessage: data.comparison.message || generateResult?.message || null,
+            blockedReport: data.comparison.report || generateResult?.report || null,
+          });
+        } else {
+          setActiveComparison(data.comparison);
+        }
         await loadComparisons();
       }
     } catch (err) {
@@ -334,6 +417,17 @@ const ComparisonAnalysis = ({ user }) => {
           </div>
           <div className="flex items-center gap-2">
             {shareFeedback && <span className="text-xs font-semibold text-[#00B4B4]">{shareFeedback}</span>}
+            {reviewQueueCount > 0 && (
+              <button
+                onClick={() => setShowReviewQueue(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-sm font-semibold hover:bg-amber-100 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+                </svg>
+                {reviewQueueCount} {i18n.language?.startsWith('da') ? 'kræver gennemgang' : 'need review'}
+              </button>
+            )}
             <button
               onClick={() => handleShareComparison(activeComparisonId)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:shadow-md transition-all"
@@ -388,6 +482,54 @@ const ComparisonAnalysis = ({ user }) => {
     );
   };
 
+  // TL-7.8 (brief §42): "This should feel reassuring, not broken." A BLOCK
+  // gating decision gets Nova's own four-part pattern — heading, what
+  // happened, what Nova did about it, and a next step — never a bare
+  // "ERROR". `notice` is the structured object the backend attaches to a
+  // BLOCK refusal response; the inline fallbacks below cover a backend
+  // that has not deployed the `notice` field yet — the panel is still
+  // informative, never blank, either way.
+  const renderUncertaintyNotice = () => {
+    const isDanish = i18n.language?.startsWith('da');
+    const notice = activeComparison?.notice;
+    const heading = notice?.heading || (isDanish ? 'Gennemgang påkrævet' : 'Review required');
+    const whatHappened = notice?.what_happened || activeComparison?.blockedMessage
+      || (isDanish
+        ? 'Nova fandt ikke tilstrækkelig pålidelig information i disse tidsplaner til at generere en sammenligning.'
+        : 'Nova did not find enough reliable information in these schedules to generate a comparison.');
+    const whatNovaDid = notice?.what_nova_did
+      || (isDanish
+        ? 'Analysen er derfor sat på pause, så der ikke offentliggøres et resultat baseret på ufuldstændige data.'
+        : 'Analysis has therefore been paused, rather than publish a result built on incomplete data.');
+    const actionLabel = notice?.action_label || (isDanish ? 'Prøv igen →' : 'Try again →');
+    const reason = activeComparison?.blockedReport?.reason;
+
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="max-w-md w-full rounded-2xl border border-amber-200 bg-amber-50 p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+            </svg>
+            <h3 className="text-base font-bold text-amber-900">{heading}</h3>
+          </div>
+          <p className="text-sm text-amber-900/90 mb-2">{whatHappened}</p>
+          <p className="text-sm text-amber-900/90 mb-1">{whatNovaDid}</p>
+          {reason && <p className="text-xs text-amber-700/80 mb-4">{reason}</p>}
+          <p className="text-xs text-amber-700 italic mb-4">
+            {isDanish ? 'Nova beskyttede dig mod et potentielt forkert resultat.' : 'Nova protected you from a potentially incorrect result.'}
+          </p>
+          <button
+            onClick={() => setActiveComparison(prev => (prev ? { ...prev, status: null } : prev))}
+            className="text-sm font-semibold text-amber-800 hover:text-amber-950 underline underline-offset-2"
+          >
+            {actionLabel}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const renderMainContent = () => {
     if (!activeComparisonId) return renderWelcome();
     if (isLoadingComparison) {
@@ -398,6 +540,7 @@ const ComparisonAnalysis = ({ user }) => {
       );
     }
     if (isProcessing) return renderProcessing();
+    if (activeComparison?.status === 'blocked') return renderUncertaintyNotice();
     if (activeComparison?.status === 'completed') return renderReport();
     return renderUpload();
   };
@@ -441,6 +584,23 @@ const ComparisonAnalysis = ({ user }) => {
         onClose={() => setShowUploadModal(false)}
         onFilesUploaded={handleFilesUploaded}
         sessionId={uploadSessionId}
+      />
+
+      <ReviewQueuePanel
+        comparisonId={activeComparisonId}
+        isOpen={showReviewQueue}
+        onClose={() => setShowReviewQueue(false)}
+        onResolved={() => refreshReviewQueueCount(activeComparisonId)}
+      />
+
+      <SourceViewerModal
+        isOpen={sourceViewerState.isOpen}
+        onClose={() => setSourceViewerState((prev) => ({ ...prev, isOpen: false }))}
+        comparisonId={activeComparisonId}
+        scheduleRole={sourceViewerState.scheduleRole}
+        pageNumber={sourceViewerState.pageNumber}
+        boundingBox={sourceViewerState.boundingBox}
+        filename={sourceViewerState.filename}
       />
     </AnalysisPageShell>
   );

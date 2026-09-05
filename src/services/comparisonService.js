@@ -71,6 +71,28 @@ export const comparisonService = {
     return parseJson(response, 'Failed to delete comparison');
   },
 
+  // TL-8.2: review queue — brief §25/§26.
+  async listReviewQueue(comparisonId) {
+    const response = await fetchWithAuth(`${API_BASE}/${comparisonId}/review-queue`);
+    return parseJson(response, 'Failed to load review queue');
+  },
+
+  async resolveReviewItem(comparisonId, itemId, chosenOptionId, note = '') {
+    const response = await postWithAuth(
+      `/api/schedule/comparisons/${comparisonId}/review-queue/${itemId}/resolve`,
+      { chosen_option_id: chosenOptionId, note },
+    );
+    return parseJson(response, 'Failed to resolve review item');
+  },
+
+  async reopenReviewItem(comparisonId, itemId, note = '') {
+    const response = await postWithAuth(
+      `/api/schedule/comparisons/${comparisonId}/review-queue/${itemId}/reopen`,
+      { note },
+    );
+    return parseJson(response, 'Failed to reopen review item');
+  },
+
   async generateDashboard(comparisonId, {
     sessionId,
     oldSessionId,

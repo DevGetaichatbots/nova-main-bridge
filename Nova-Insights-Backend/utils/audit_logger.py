@@ -28,7 +28,11 @@ EVENT_TYPES = {
     'USER_DELETED': 'user_deleted',
     'COMPANY_UPDATED': 'company_updated',
     'PASSWORD_RESET': 'password_reset',
-    'PROFILE_UPDATED': 'profile_updated'
+    'PROFILE_UPDATED': 'profile_updated',
+    'COMPARISON_GENERATED': 'comparison_generated',
+    'ANALYSIS_GENERATED': 'analysis_generated',
+    'REVIEW_ITEM_RESOLVED': 'review_item_resolved',
+    'REVIEW_ITEM_REOPENED': 'review_item_reopened'
 }
 
 def log_audit_event(

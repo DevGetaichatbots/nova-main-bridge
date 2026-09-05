@@ -373,6 +373,21 @@ const ScheduleAnalysis = () => {
           return updated;
         });
         await loadAnalyses();
+      } else if (data.status === 'blocked') {
+        // TL-7.8 (brief §42): a BLOCK gating decision (TL-4.6/TL-5.5) is a
+        // protective pause, not a crash — it must not collapse into the
+        // same generic "analysis failed" error banner as an actual
+        // exception. `data.notice`/`data.message`/`data.report` are the
+        // structured, reassuring fields the backend already computed;
+        // render them via `renderUncertaintyNotice`, never a bare error.
+        setActiveAnalysis(prev => ({
+          ...(prev || {}),
+          status: 'blocked',
+          filename: file.name,
+          notice: data.notice || null,
+          blockedMessage: data.message || null,
+          blockedReport: data.report || null,
+        }));
       } else {
         setError(data.error || t('scheduleAnalysis.errors.failed'));
         setActiveAnalysis(prev => ({ ...prev, status: 'error' }));
@@ -900,10 +915,61 @@ const ScheduleAnalysis = () => {
     </div>
   );
 
+  // TL-7.8 (brief §42): "This should feel reassuring, not broken." A BLOCK
+  // gating decision gets Nova's own four-part pattern — heading, what
+  // happened, what Nova did about it, and a next step — never a bare
+  // "ERROR". `notice` is the structured object the backend attaches to a
+  // BLOCK refusal response (`TruncationReport.to_refusal_response` /
+  // `PreflightReport.to_refusal_response`, `src/trust/preflight.py`);
+  // the inline fallbacks below cover an older backend that has not
+  // deployed the `notice` field yet — the panel is still informative,
+  // never blank, either way.
+  const renderUncertaintyNotice = () => {
+    const isDanish = i18n.language?.startsWith('da');
+    const notice = activeAnalysis?.notice;
+    const heading = notice?.heading || (isDanish ? 'Gennemgang påkrævet' : 'Review required');
+    const whatHappened = notice?.what_happened || activeAnalysis?.blockedMessage
+      || (isDanish
+        ? 'Nova fandt ikke tilstrækkelig pålidelig information i denne tidsplan til at generere en analyse.'
+        : 'Nova did not find enough reliable information in this schedule to generate an analysis.');
+    const whatNovaDid = notice?.what_nova_did
+      || (isDanish
+        ? 'Analysen er derfor sat på pause, så der ikke offentliggøres et resultat baseret på ufuldstændige data.'
+        : 'Analysis has therefore been paused, rather than publish a result built on incomplete data.');
+    const actionLabel = notice?.action_label || (isDanish ? 'Prøv igen →' : 'Try again →');
+    const reason = activeAnalysis?.blockedReport?.reason;
+
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="max-w-md w-full rounded-2xl border border-amber-200 bg-amber-50 p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+            </svg>
+            <h3 className="text-base font-bold text-amber-900">{heading}</h3>
+          </div>
+          <p className="text-sm text-amber-900/90 mb-2">{whatHappened}</p>
+          <p className="text-sm text-amber-900/90 mb-1">{whatNovaDid}</p>
+          {reason && <p className="text-xs text-amber-700/80 mb-4">{reason}</p>}
+          <p className="text-xs text-amber-700 italic mb-4">
+            {isDanish ? 'Nova beskyttede dig mod et potentielt forkert resultat.' : 'Nova protected you from a potentially incorrect result.'}
+          </p>
+          <button
+            onClick={() => setActiveAnalysis(prev => (prev ? { ...prev, status: null } : prev))}
+            className="text-sm font-semibold text-amber-800 hover:text-amber-950 underline underline-offset-2"
+          >
+            {actionLabel}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const renderMainContent = () => {
     if (!activeAnalysisId) return renderWelcome();
     if (isLoadingAnalysis) return renderLoading();
     if (isProcessing) return renderProcessing();
+    if (activeAnalysis?.status === 'blocked') return renderUncertaintyNotice();
     if (activeAnalysis?.status === 'completed' && activeAnalysis?.predictive_insights) return renderReport();
     return renderUploadZone();
   };

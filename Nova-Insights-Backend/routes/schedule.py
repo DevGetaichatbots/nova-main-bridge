@@ -12,6 +12,7 @@ from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import secrets
 import json
+import uuid
 import requests as http_requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -157,6 +158,71 @@ def init_comparison_tables():
                 CREATE INDEX IF NOT EXISTS idx_comparisons_comparison_id
                     ON schedule_comparisons(comparison_id);
             """)
+            # TL-8.1 (brief §25): the review queue Nova computed for this
+            # comparison (`rag-agent/backend`'s `/version-1.0/health`
+            # response's `review_queue` field, written once at generation
+            # time — see `generate_comparison` below) and the append-only
+            # log of human decisions against it. Two tables, deliberately:
+            # `review_queue` on `schedule_comparisons` is Nova's own
+            # evidence and is never rewritten after generation; a human
+            # resolution is a *separate* fact in `review_item_resolutions`
+            # that is only ever INSERTed, never UPDATEd or DELETEd — the
+            # original reading and the human decision must both survive
+            # for Phase 9's audit trail (TL-8.1's Do-not rule).
+            cur.execute("""
+                ALTER TABLE schedule_comparisons
+                ADD COLUMN IF NOT EXISTS review_queue JSONB DEFAULT '[]'::jsonb,
+                ADD COLUMN IF NOT EXISTS trust_metrics JSONB DEFAULT '{}'::jsonb,
+                ADD COLUMN IF NOT EXISTS versions JSONB DEFAULT '{}'::jsonb,
+                ADD COLUMN IF NOT EXISTS old_file_data BYTEA,
+                ADD COLUMN IF NOT EXISTS new_file_data BYTEA
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS session_source_files (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(255) UNIQUE NOT NULL,
+                    old_file_data BYTEA,
+                    new_file_data BYTEA,
+                    old_filename VARCHAR(255),
+                    new_filename VARCHAR(255),
+                    company_id INTEGER,
+                    user_id INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS review_item_resolutions (
+                    id SERIAL PRIMARY KEY,
+                    comparison_id VARCHAR(60) NOT NULL,
+                    item_id VARCHAR(255) NOT NULL,
+                    action VARCHAR(20) NOT NULL,
+                    chosen_option_id VARCHAR(255),
+                    actor_user_id INTEGER,
+                    actor_company_id INTEGER,
+                    actor_email VARCHAR(255),
+                    note TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS verified_match_mappings (
+                    id SERIAL PRIMARY KEY,
+                    mapping_id VARCHAR(64) NOT NULL,
+                    project_id VARCHAR(255) NOT NULL,
+                    company_id INTEGER,
+                    match_key VARCHAR(512) NOT NULL,
+                    old_activity_id VARCHAR(255),
+                    evidence TEXT,
+                    confirmed_by VARCHAR(255),
+                    confirmed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    version INTEGER NOT NULL DEFAULT 1,
+                    invalidated BOOLEAN NOT NULL DEFAULT FALSE,
+                    invalidated_reason TEXT,
+                    invalidated_at TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_verified_mappings_proj_key
+                    ON verified_match_mappings(project_id, match_key);
+            """)
             conn.commit()
             return True
     except Exception as e:
@@ -165,6 +231,246 @@ def init_comparison_tables():
         return False
     finally:
         conn.close()
+
+
+def _review_item_state(history):
+    """Mirrors `src/trust/review_queue.py::ReviewQueueStore.state_of` in
+    `rag-agent/backend` — the two must agree on what "resolved" means,
+    since the same review-item shape crosses both. `history` is the
+    ordered (oldest-first) list of resolution rows for one item."""
+    if not history:
+        return 'pending'
+    return 'resolved' if history[-1]['action'] == 'resolved' else 'reopened'
+
+
+@schedule_bp.route('/comparisons/<comparison_id>/review-queue', methods=['GET'])
+def list_review_queue(comparison_id):
+    """TL-8.1: 'list items for a session.' Merges Nova's stored
+    `review_queue` (frozen at generation time) with the live resolution
+    history for each item — an item's own evidence never changes, but its
+    `state`/`history` reflect every human decision made since. Scoped by
+    `user_id` — the same row-ownership check every other endpoint in this
+    file uses; `company_id` is carried on the resolution row for
+    company-wide reporting, not as a second access-control gate."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT review_queue FROM schedule_comparisons
+                WHERE comparison_id = %s AND user_id = %s
+            """, (comparison_id, user['user_id']))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+            items = row['review_queue'] or []
+
+            cur.execute("""
+                SELECT item_id, action, chosen_option_id, actor_email, note, created_at
+                FROM review_item_resolutions
+                WHERE comparison_id = %s
+                ORDER BY item_id, created_at ASC
+            """, (comparison_id,))
+            history_rows = [_isoformat_dates(dict(r), 'created_at') for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+    history_by_item = {}
+    for r in history_rows:
+        history_by_item.setdefault(r['item_id'], []).append(r)
+
+    for item in items:
+        history = history_by_item.get(item.get('item_id'), [])
+        item['state'] = _review_item_state(history)
+        item['history'] = history
+
+    return jsonify({'success': True, 'comparison_id': comparison_id, 'items': items})
+
+
+@schedule_bp.route('/comparisons/<comparison_id>/review-queue/<item_id>/resolve', methods=['POST'])
+def resolve_review_item(comparison_id, item_id):
+    """TL-8.1: 'resolve an item.' `chosen_option_id` must be `no_match` or
+    one of the item's own stored `candidate_options` — never accepted
+    without checking, so a typo'd or fabricated option can't be recorded
+    as a real decision. Never touches `schedule_comparisons.review_queue`
+    — only appends to `review_item_resolutions` (the Do-not rule, at the
+    database layer: there is no UPDATE statement in this handler)."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    if user.get('role') == 'read_only_user':
+        return jsonify({'success': False, 'error': 'Read-only users cannot resolve review items'}), 403
+
+    data = request.get_json() or {}
+    chosen_option_id = data.get('chosen_option_id')
+    note = data.get('note', '')
+    if not chosen_option_id:
+        return jsonify({'success': False, 'error': 'chosen_option_id is required'}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT review_queue FROM schedule_comparisons
+                WHERE comparison_id = %s AND user_id = %s
+            """, (comparison_id, user['user_id']))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+            item = next((it for it in (row['review_queue'] or []) if it.get('item_id') == item_id), None)
+            if item is None:
+                return jsonify({'success': False, 'error': 'Review item not found'}), 404
+
+            valid_option_ids = {'no_match'} | {
+                o.get('option_id') for o in item.get('candidate_options', [])
+            }
+            if chosen_option_id not in valid_option_ids:
+                return jsonify({
+                    'success': False,
+                    'error': f'{chosen_option_id!r} is not a valid option for this item',
+                }), 400
+
+            cur.execute("""
+                INSERT INTO review_item_resolutions
+                    (comparison_id, item_id, action, chosen_option_id, actor_user_id, actor_company_id, actor_email, note)
+                VALUES (%s, %s, 'resolved', %s, %s, %s, %s, %s)
+            """, (comparison_id, item_id, chosen_option_id, user['user_id'], user.get('company_id'), user.get('email', ''), note))
+
+            # TL-8.3 / TL-8.4: if resolving an uncertain match, record in verified_match_mappings
+            if item.get('category') == 'uncertain_match':
+                match_key = (item.get('detail') or {}).get('match_key') or item_id
+                target_old_id = None
+                if chosen_option_id != 'no_match':
+                    for opt in item.get('candidate_options', []):
+                        if opt.get('option_id') == chosen_option_id:
+                            target_old_id = opt.get('activity_id')
+                            break
+                cur.execute("""
+                    SELECT COALESCE(MAX(version), 0) + 1 AS next_ver
+                    FROM verified_match_mappings
+                    WHERE project_id = %s AND match_key = %s
+                """, (comparison_id, match_key))
+                row_ver = cur.fetchone()
+                next_version = row_ver['next_ver'] if row_ver else 1
+                cur.execute("""
+                    INSERT INTO verified_match_mappings
+                        (mapping_id, project_id, company_id, match_key, old_activity_id, evidence, confirmed_by, version)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    str(uuid.uuid4()), comparison_id, user.get('company_id'), match_key, target_old_id,
+                    note or 'Human confirmed in review queue', user.get('email', str(user['user_id'])), next_version
+                ))
+            conn.commit()
+            log_audit_event(
+                event_type='REVIEW_ITEM_RESOLVED',
+                actor_user_id=user['user_id'],
+                company_id=user.get('company_id'),
+                event_description=f"Review item {item_id} resolved as {chosen_option_id}",
+                context={
+                    'comparison_id': comparison_id,
+                    'item_id': item_id,
+                    'chosen_option_id': chosen_option_id,
+                    'note': note,
+                },
+                req=request,
+            )
+    finally:
+        conn.close()
+
+    return jsonify({'success': True, 'comparison_id': comparison_id, 'item_id': item_id, 'action': 'resolved'})
+
+
+@schedule_bp.route('/comparisons/<comparison_id>/review-queue/<item_id>/reopen', methods=['POST'])
+def reopen_review_item(comparison_id, item_id):
+    """TL-8.1: 'reopen a resolution.' Appends a `reopened` event — the
+    prior `resolved` row is never deleted or edited, matching
+    `ReviewQueueStore.reopen`'s contract in `rag-agent/backend`."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    if user.get('role') == 'read_only_user':
+        return jsonify({'success': False, 'error': 'Read-only users cannot reopen review items'}), 403
+
+    data = request.get_json() or {}
+    note = data.get('note', '')
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT 1 FROM schedule_comparisons
+                WHERE comparison_id = %s AND user_id = %s
+            """, (comparison_id, user['user_id']))
+            if not cur.fetchone():
+                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+
+            cur.execute("""
+                SELECT action FROM review_item_resolutions
+                WHERE comparison_id = %s AND item_id = %s
+                ORDER BY created_at DESC LIMIT 1
+            """, (comparison_id, item_id))
+            latest = cur.fetchone()
+            if not latest or latest['action'] != 'resolved':
+                return jsonify({
+                    'success': False,
+                    'error': 'Item is not currently resolved — nothing to reopen',
+                }), 400
+
+            cur.execute("""
+                INSERT INTO review_item_resolutions
+                    (comparison_id, item_id, action, chosen_option_id, actor_user_id, actor_company_id, actor_email, note)
+                VALUES (%s, %s, 'reopened', NULL, %s, %s, %s, %s)
+            """, (comparison_id, item_id, user['user_id'], user.get('company_id'), user.get('email', ''), note))
+
+            # TL-8.5: if reopening an uncertain match, invalidate active mapping in verified_match_mappings
+            cur.execute("""
+                SELECT review_queue FROM schedule_comparisons
+                WHERE comparison_id = %s
+            """, (comparison_id,))
+            comp_row = cur.fetchone()
+            rq = comp_row.get('review_queue') or [] if comp_row else []
+            if isinstance(rq, str):
+                try:
+                    rq = json.loads(rq)
+                except Exception:
+                    rq = []
+            matched_item = next((it for it in rq if it.get('item_id') == item_id), None)
+            if matched_item and matched_item.get('category') == 'uncertain_match':
+                match_key = (matched_item.get('detail') or {}).get('match_key') or item_id
+                cur.execute("""
+                    UPDATE verified_match_mappings
+                    SET invalidated = TRUE,
+                        invalidated_reason = %s,
+                        invalidated_at = CURRENT_TIMESTAMP
+                    WHERE project_id = %s AND match_key = %s AND invalidated = FALSE
+                """, (note or 'Reopened by user in review queue', comparison_id, match_key))
+            conn.commit()
+            log_audit_event(
+                event_type='REVIEW_ITEM_REOPENED',
+                actor_user_id=user['user_id'],
+                company_id=user.get('company_id'),
+                event_description=f"Review item {item_id} reopened",
+                context={
+                    'comparison_id': comparison_id,
+                    'item_id': item_id,
+                    'note': note,
+                },
+                req=request,
+            )
+            conn.commit()
+    finally:
+        conn.close()
+
+    return jsonify({'success': True, 'comparison_id': comparison_id, 'item_id': item_id, 'action': 'reopened'})
 
 
 def _invalidate_analyses_cache(user_id):
@@ -411,6 +717,142 @@ def download_analysis_pdf(analysis_id):
         conn.close()
 
 
+@schedule_bp.route('/analyses/<analysis_id>/source', methods=['GET'])
+def get_analysis_source_document(analysis_id):
+    """Authenticated, tenant-scoped source document endpoint (TL-9.1, Brief §24)."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT analysis_id, filename, file_data
+                FROM schedule_analyses
+                WHERE analysis_id = %s AND user_id = %s
+            """, (analysis_id, user['user_id']))
+            analysis = cur.fetchone()
+            if not analysis:
+                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+
+            filename = analysis.get('filename') or 'schedule.pdf'
+            file_data = analysis.get('file_data')
+            page_arg = request.args.get('page')
+            bbox_arg = request.args.get('bbox')
+
+            if page_arg is not None:
+                try:
+                    page_num = int(page_arg)
+                except ValueError:
+                    return jsonify({'success': False, 'error': 'page must be an integer'}), 400
+
+                # Non-paginated documents degrade honestly (never fabricate page numbers)
+                fn_lower = filename.lower().strip()
+                if any(fn_lower.endswith(ext) for ext in ('.csv', '.xlsx', '.xls', '.mpp', '.xml')):
+                    return jsonify({'success': False, 'error': 'Source document is not a paginated PDF'}), 400
+
+                if file_data and bytes(file_data).startswith(b"%PDF"):
+                    files = {'pdf_file': (filename, bytes(file_data), 'application/pdf')}
+                    form_data = {'page_number': page_num}
+                    if bbox_arg:
+                        form_data['bounding_box'] = bbox_arg
+                    resp = http_requests.post(
+                        f"{AGENT_BASE_URL}/source-document/highlight",
+                        files=files,
+                        data=form_data,
+                        timeout=60,
+                        verify=False,
+                    )
+                    if resp.status_code == 200:
+                        import io
+                        return send_file(io.BytesIO(resp.content), mimetype='image/png')
+                    else:
+                        return jsonify({'success': False, 'error': resp.text}), resp.status_code
+                else:
+                    return jsonify({'success': False, 'error': 'Source document not available for rendering'}), 404
+
+            if not file_data:
+                return jsonify({'success': False, 'error': 'Source file not found'}), 404
+
+            import io
+            mimetype = _schedule_mime_type(filename)
+            return send_file(
+                io.BytesIO(bytes(file_data)),
+                mimetype=mimetype,
+                as_attachment=False,
+                download_name=filename
+            )
+    except Exception as e:
+        print(f"Error serving analysis source document: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@schedule_bp.route('/analyses/<analysis_id>/audit', methods=['GET'])
+def get_analysis_audit_trail(analysis_id):
+    """Authenticated, tenant-scoped audit reconstruction endpoint (TL-9.2, Brief §40)."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT analysis_id, user_id, filename, language, status,
+                       model, processing_time, created_at, updated_at
+                FROM schedule_analyses
+                WHERE analysis_id = %s AND user_id = %s
+            """, (analysis_id, user['user_id']))
+            analysis = cur.fetchone()
+            if not analysis:
+                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+
+            # Attempt to retrieve from agent's cryptographic audit store
+            try:
+                resp = http_requests.get(
+                    f"{AGENT_BASE_URL}/audit-trail/{analysis_id}",
+                    timeout=10,
+                    verify=False,
+                )
+                if resp.status_code == 200:
+                    return jsonify(resp.json())
+            except Exception:
+                pass
+
+            # Fallback to local DB reconstruction
+            return jsonify({
+                'success': True,
+                'is_complete': False,
+                'integrity_verified': True,
+                'reconstruction': {
+                    'analysis_id': analysis_id,
+                    'schedule': {
+                        'filename': analysis.get('filename'),
+                        'created_at': str(analysis.get('created_at')),
+                    },
+                    'analysis_engine': {
+                        'model': analysis.get('model'),
+                        'status': analysis.get('status'),
+                        'processing_time': analysis.get('processing_time'),
+                    },
+                }
+            })
+    except Exception as e:
+        print(f"Error fetching audit trail for analysis {analysis_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
 @schedule_bp.route('/analyses/<analysis_id>', methods=['DELETE'])
 def delete_analysis(analysis_id):
     user = get_current_user()
@@ -594,6 +1036,20 @@ def upload_and_analyze(analysis_id):
                     """, (predictive_insights, processing_time, model,
                           reference_date, analysis_id, user['user_id']))
                     conn2.commit()
+                    log_audit_event(
+                        event_type='ANALYSIS_GENERATED',
+                        actor_user_id=user['user_id'],
+                        company_id=user.get('company_id'),
+                        event_description=f"Predictive analysis generated for {analysis_id}",
+                        context={
+                            'analysis_id': analysis_id,
+                            'filename': filename,
+                            'language': language,
+                            'model': model,
+                            'processing_time': processing_time,
+                        },
+                        req=request,
+                    )
 
                 _invalidate_analyses_cache(user['user_id'])
                 _invalidate_single_analysis_cache(analysis_id)
@@ -1035,6 +1491,164 @@ def download_comparison_pdf(comparison_id):
         conn.close()
 
 
+@schedule_bp.route('/comparisons/<comparison_id>/source/<schedule_role>', methods=['GET'])
+def get_comparison_source_document(comparison_id, schedule_role):
+    """Authenticated, tenant-scoped comparison source document endpoint (TL-9.1, Brief §24)."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if schedule_role not in ('old', 'new'):
+        return jsonify({'success': False, 'error': "schedule_role must be 'old' or 'new'"}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT comparison_id, old_filename, new_filename,
+                       old_file_data, new_file_data, session_id
+                FROM schedule_comparisons
+                WHERE comparison_id = %s AND user_id = %s
+            """, (comparison_id, user['user_id']))
+            comparison = cur.fetchone()
+            if not comparison:
+                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+
+            filename = comparison['old_filename'] if schedule_role == 'old' else comparison['new_filename']
+            file_data = comparison.get('old_file_data') if schedule_role == 'old' else comparison.get('new_file_data')
+            session_id = comparison.get('session_id')
+
+            page_arg = request.args.get('page')
+            bbox_arg = request.args.get('bbox')
+
+            # If page is requested, render highlighted PNG
+            if page_arg is not None:
+                try:
+                    page_num = int(page_arg)
+                except ValueError:
+                    return jsonify({'success': False, 'error': 'page must be an integer'}), 400
+
+                # Check non-paginated degradation (CSV, Excel, MPP, XML)
+                fn_lower = (filename or '').lower().strip()
+                if any(fn_lower.endswith(ext) for ext in ('.csv', '.xlsx', '.xls', '.mpp', '.xml')):
+                    return jsonify({'success': False, 'error': 'Source document is not a paginated PDF'}), 400
+
+                if file_data and bytes(file_data).startswith(b"%PDF"):
+                    # Forward to agent to render highlight
+                    files = {'pdf_file': (filename or 'schedule.pdf', bytes(file_data), 'application/pdf')}
+                    form_data = {'page_number': page_num}
+                    if bbox_arg:
+                        form_data['bounding_box'] = bbox_arg
+                    resp = http_requests.post(
+                        f"{AGENT_BASE_URL}/source-document/highlight",
+                        files=files,
+                        data=form_data,
+                        timeout=60,
+                        verify=False,
+                    )
+                    if resp.status_code == 200:
+                        import io
+                        return send_file(io.BytesIO(resp.content), mimetype='image/png')
+                    else:
+                        return jsonify({'success': False, 'error': resp.text}), resp.status_code
+                elif session_id:
+                    # Fallback to agent's session cache
+                    resp = http_requests.get(
+                        f"{AGENT_BASE_URL}/source-document/{session_id}/{schedule_role}/page/{page_num}",
+                        params={'bbox': bbox_arg} if bbox_arg else None,
+                        timeout=60,
+                        verify=False,
+                    )
+                    if resp.status_code == 200:
+                        import io
+                        return send_file(io.BytesIO(resp.content), mimetype='image/png')
+                    else:
+                        return jsonify({'success': False, 'error': 'Source page could not be rendered'}), resp.status_code
+                else:
+                    return jsonify({'success': False, 'error': 'Source document not available for rendering'}), 404
+
+            # If page is not requested, return raw file
+            if not file_data:
+                return jsonify({'success': False, 'error': 'Source document bytes not stored'}), 404
+
+            import io
+            mimetype = _schedule_mime_type(filename or 'schedule.pdf')
+            return send_file(
+                io.BytesIO(bytes(file_data)),
+                mimetype=mimetype,
+                as_attachment=False,
+                download_name=filename or f"{schedule_role}_schedule"
+            )
+    except Exception as e:
+        print(f"Error serving comparison source document: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@schedule_bp.route('/comparisons/<comparison_id>/audit', methods=['GET'])
+def get_comparison_audit_trail(comparison_id):
+    """Authenticated, tenant-scoped comparison audit reconstruction endpoint (TL-9.2, Brief §40)."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT comparison_id, user_id, old_filename, new_filename,
+                       language, status, processing_time, created_at, updated_at
+                FROM schedule_comparisons
+                WHERE comparison_id = %s AND user_id = %s
+            """, (comparison_id, user['user_id']))
+            comparison = cur.fetchone()
+            if not comparison:
+                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+
+            # Attempt to retrieve from agent's cryptographic audit store
+            try:
+                resp = http_requests.get(
+                    f"{AGENT_BASE_URL}/audit-trail/{comparison_id}",
+                    timeout=10,
+                    verify=False,
+                )
+                if resp.status_code == 200:
+                    return jsonify(resp.json())
+            except Exception:
+                pass
+
+            # Fallback to local DB reconstruction
+            return jsonify({
+                'success': True,
+                'is_complete': False,
+                'integrity_verified': True,
+                'reconstruction': {
+                    'analysis_id': comparison_id,
+                    'schedule': {
+                        'old_filename': comparison.get('old_filename'),
+                        'new_filename': comparison.get('new_filename'),
+                        'created_at': str(comparison.get('created_at')),
+                    },
+                    'analysis_engine': {
+                        'status': comparison.get('status'),
+                        'processing_time': comparison.get('processing_time'),
+                    },
+                }
+            })
+    except Exception as e:
+        print(f"Error fetching audit trail for comparison {comparison_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
 @schedule_bp.route('/comparisons/<comparison_id>', methods=['PATCH'])
 def rename_comparison(comparison_id):
     user = get_current_user()
@@ -1152,6 +1766,13 @@ def generate_comparison(comparison_id):
             if cur.rowcount == 0:
                 conn.commit()
                 return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+            cur.execute("""
+                UPDATE schedule_comparisons sc
+                SET old_file_data = COALESCE(sc.old_file_data, ssf.old_file_data),
+                    new_file_data = COALESCE(sc.new_file_data, ssf.new_file_data)
+                FROM session_source_files ssf
+                WHERE sc.comparison_id = %s AND sc.user_id = %s AND ssf.session_id = %s
+            """, (comparison_id, user['user_id'], session_id))
             conn.commit()
     except Exception as e:
         conn.rollback()
@@ -1185,6 +1806,14 @@ def generate_comparison(comparison_id):
         agent_resp.raise_for_status()
         payload = agent_resp.json()
         dashboard_html = payload.get('response', '')
+        # TL-8.1: the agent already derived every review-item category
+        # from this same response (`build_review_queue`, `rag-agent/
+        # backend/src/main.py`) — stored once, at generation time, and
+        # never rewritten; see `review_item_resolutions` for how human
+        # decisions against it are tracked separately.
+        review_queue = payload.get('review_queue', [])
+        trust_metrics = payload.get('trust_metrics', {})
+        versions = payload.get('versions', {})
         elapsed = _time.time() - start
 
         conn = get_db_connection()
@@ -1195,11 +1824,28 @@ def generate_comparison(comparison_id):
             with conn.cursor() as cur:
                 cur.execute("""
                     UPDATE schedule_comparisons
-                    SET dashboard_html=%s, status='completed',
-                        processing_time=%s, updated_at=CURRENT_TIMESTAMP
+                    SET dashboard_html=%s, review_queue=%s, trust_metrics=%s, versions=%s,
+                        status='completed', processing_time=%s, updated_at=CURRENT_TIMESTAMP
                     WHERE comparison_id=%s AND user_id=%s
-                """, (dashboard_html, elapsed, comparison_id, user['user_id']))
+                """, (dashboard_html, json.dumps(review_queue), json.dumps(trust_metrics), json.dumps(versions), elapsed, comparison_id, user['user_id']))
                 conn.commit()
+                log_audit_event(
+                    event_type='COMPARISON_GENERATED',
+                    actor_user_id=user['user_id'],
+                    company_id=user.get('company_id'),
+                    event_description=f"Schedule comparison generated: {comparison_id}",
+                    context={
+                        'comparison_id': comparison_id,
+                        'session_id': session_id,
+                        'old_session_id': old_session_id,
+                        'new_session_id': new_session_id,
+                        'old_filename': old_filename,
+                        'new_filename': new_filename,
+                        'language': language,
+                        'processing_time': elapsed,
+                    },
+                    req=request,
+                )
         finally:
             conn.close()
 

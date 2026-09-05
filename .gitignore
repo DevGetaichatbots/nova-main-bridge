@@ -33,3 +33,16 @@ attached_assets/
 **/uploads/
 **/attached_assets/
 
+# Python / Environments / Caches
+.env
+*.env
+.env.*
+.venv/
+**/__pycache__/
+*.py[cod]
+
+# Temp build & verify dirs
+dist-verify*
+temp-build/
+
+
