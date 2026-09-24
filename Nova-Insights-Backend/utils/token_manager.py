@@ -4,6 +4,7 @@ import sys
 from datetime import datetime, timedelta
 import hashlib
 import uuid
+import time
 
 
 SECRET_KEY = os.getenv('JWT_SECRET')
@@ -75,6 +76,24 @@ def is_token_blacklisted(token):
         return False
 
 
+def revoke_user_sessions(user_ids):
+    """Kill every access token issued to these users so far (e.g. company deactivated)."""
+    from utils.redis_client import cache_set
+    now = int(time.time())
+    for user_id in user_ids:
+        cache_set(f"sessions_revoked:{user_id}", now, ex=ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+
+
+def is_session_revoked(payload):
+    """True if the token was issued at or before the user's last session revocation."""
+    try:
+        from utils.redis_client import cache_get
+        revoked_at = cache_get(f"sessions_revoked:{payload.get('user_id')}")
+        return revoked_at is not None and payload.get('iat', 0) <= int(revoked_at)
+    except Exception:
+        return False
+
+
 def verify_access_token(token):
     """Verify and decode access token"""
     try:
@@ -83,6 +102,8 @@ def verify_access_token(token):
         payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
         if payload.get('type') != 'access':
             return None, "Invalid token type"
+        if is_session_revoked(payload):
+            return None, "Token has been revoked"
         return payload, None
     except jwt.ExpiredSignatureError:
         return None, "Token has expired"
@@ -127,6 +148,8 @@ def decode_token(token):
         if is_token_blacklisted(token):
             return None
         payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        if is_session_revoked(payload):
+            return None
         return payload
     except jwt.ExpiredSignatureError:
         return None

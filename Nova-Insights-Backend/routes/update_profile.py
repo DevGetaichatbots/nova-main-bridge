@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
 from utils.database import get_db_connection
+from utils.i18n import t
 from utils.validators import validate_password, validate_name
 from middleware.auth_middleware import require_auth
 from psycopg2.extras import RealDictCursor
@@ -24,7 +25,7 @@ def update_profile():
         if not data:
             return jsonify({
                 'success': False,
-                'error': 'Anmodningsdata påkrævet',
+                'error': t('common.request_data_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -38,7 +39,7 @@ def update_profile():
         if not first_name and not last_name and not password:
             return jsonify({
                 'success': False,
-                'error': 'Mindst ét felt skal opdateres',
+                'error': t('common.at_least_one_field'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -65,14 +66,14 @@ def update_profile():
             if not confirm_password:
                 return jsonify({
                     'success': False,
-                    'error': 'Bekræftelse af adgangskode er påkrævet',
+                    'error': t('password.confirm_required'),
                     'code': 'VALIDATION_ERROR'
                 }), 400
             
             if password != confirm_password:
                 return jsonify({
                     'success': False,
-                    'error': 'Adgangskoder matcher ikke',
+                    'error': t('password.mismatch'),
                     'code': 'PASSWORD_MISMATCH'
                 }), 400
             
@@ -94,7 +95,7 @@ def update_profile():
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -132,7 +133,7 @@ def update_profile():
                 if not updated_user:
                     return jsonify({
                         'success': False,
-                        'error': 'Bruger ikke fundet',
+                        'error': t('user.not_found'),
                         'code': 'USER_NOT_FOUND'
                     }), 404
                 
@@ -140,7 +141,7 @@ def update_profile():
                 
                 return jsonify({
                     'success': True,
-                    'message': 'Profil opdateret med succes',
+                    'message': t('user.profile_updated'),
                     'data': {
                         'userId': f"user_{updated_user['id']}",
                         'firstName': updated_user['first_name'],
@@ -155,7 +156,7 @@ def update_profile():
             print(f"Update profile error: {e}")
             return jsonify({
                 'success': False,
-                'error': 'Kunne ikke opdatere profil',
+                'error': t('user.profile_update_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -165,6 +166,6 @@ def update_profile():
         print(f"Update profile request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Ugyldig anmodningsdata',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400

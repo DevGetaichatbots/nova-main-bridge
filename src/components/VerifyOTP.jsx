@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import AuthLayout from "./auth/AuthLayout";
+import FormAlert from "./auth/FormAlert";
 import { useTranslation } from 'react-i18next';
 
 const VerifyOTP = () => {
@@ -132,238 +134,47 @@ const VerifyOTP = () => {
     }
   };
 
-  const handleBack = () => {
-    navigate('/forgot-password');
-  };
-
   return (
-    <div
-      className="min-h-screen w-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
-      style={{
-        background: "#ffffff",
-      }}
-    >
-      {/* Back Button */}
-      <button
-        onClick={handleBack}
-        className="fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-white transition-all duration-300 hover:scale-105"
-        style={{
-          background: "#1eb5ee",
-          boxShadow: "0 8px 25px rgba(0, 214, 214, 0.3)",
-        }}
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        <span>{t('verifyOTP.back')}</span>
-      </button>
-
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-32 h-32 rounded-full opacity-10 animate-pulse bg-gradient-to-r from-sky-400 to-sky-500"></div>
-        <div className="absolute top-3/4 right-1/4 w-24 h-24 rounded-xl opacity-10 animate-bounce bg-gradient-to-r from-sky-300 to-sky-400"></div>
-        <div className="absolute top-1/2 right-1/3 w-20 h-20 rounded-full opacity-10 animate-ping bg-gradient-to-r from-sky-500 to-sky-600"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-28 h-28 rounded-2xl opacity-10 animate-pulse bg-gradient-to-r from-sky-400 to-sky-500"></div>
-      </div>
-
-      <div className="max-w-md w-full space-y-8 relative z-10">
-        {/* Header */}
-        <div className="text-center">
-          <div className="flex justify-center mb-6">
-            <div
-              className="w-20 h-20 rounded-3xl flex items-center justify-center animate-pulse-glow"
-              style={{
-                background: "#1eb5ee",
-                boxShadow: "0 0 40px rgba(0, 214, 214, 0.4)",
-              }}
-            >
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-
-          <h2
-            className="text-4xl font-bold mb-2"
-            style={{
-              color: "#1c2631",
-            }}
-          >
-            {t('verifyOTP.title')}
-          </h2>
-          <p className="text-lg" style={{color: "#475569"}}>
-            {t('verifyOTP.subtitle')}
-          </p>
-          <p className="text-base font-semibold mt-1" style={{color: "#1eb5ee"}}>
-            {email}
-          </p>
-        </div>
-
-        {/* Form */}
-        <div
-          className="relative rounded-3xl shadow-2xl border p-8"
-          style={{
-            background: "linear-gradient(145deg, rgba(0, 214, 214, 0.15) 0%, rgba(112, 211, 213, 0.1) 100%)",
-            backdropFilter: "blur(10px)",
-            borderColor: "rgba(0, 214, 214, 0.3)",
-          }}
-        >
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Success Message */}
-            {successMessage && (
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                <p className="text-emerald-400 text-sm flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {successMessage}
-                </p>
-              </div>
-            )}
-
-            {/* General Error Message */}
-            {errors.general && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-                <p className="text-red-400 text-sm flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {errors.general}
-                </p>
-              </div>
-            )}
-
-            {/* OTP Input Fields */}
-            <div className="space-y-4">
-              <label className="block text-sm font-semibold text-center" style={{color: "#1c2631"}}>
-                {t('verifyOTP.enterCode')}
-              </label>
-              
-              <div className="flex justify-center gap-2">
-                {otp.map((digit, index) => (
-                  <input
-                    key={index}
-                    ref={(el) => (inputRefs.current[index] = el)}
-                    type="text"
-                    maxLength="1"
-                    value={digit}
-                    onChange={(e) => handleChange(index, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(index, e)}
-                    onPaste={index === 0 ? handlePaste : undefined}
-                    className={`w-12 h-14 text-center text-2xl font-bold rounded-xl bg-white border-2 transition-all duration-300 focus:outline-none focus:ring-2 ${
-                      errors.otp || errors.general
-                        ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/50"
-                        : "focus:ring-[#1eb5ee]/50"
-                    }`}
-                    style={{
-                      borderColor: errors.otp || errors.general ? "" : "rgba(0, 214, 214, 0.3)",
-                      color: "#1c2631"
-                    }}
-                    onFocus={(e) => {
-                      e.target.select();
-                      if (!errors.otp && !errors.general) {
-                        e.target.style.borderColor = "#1eb5ee";
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (!errors.otp && !errors.general) {
-                        e.target.style.borderColor = "rgba(0, 214, 214, 0.3)";
-                      }
-                    }}
-                    disabled={isLoading}
-                  />
-                ))}
-              </div>
-
-              {errors.otp && (
-                <p className="text-red-400 text-sm text-center animate-shake flex items-center justify-center gap-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {errors.otp}
-                </p>
-              )}
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`group relative w-full flex justify-center py-4 px-4 border border-transparent rounded-xl text-white font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden ${
-                isLoading ? "animate-pulse" : ""
-              }`}
-              style={{
-                background: "#1eb5ee",
-                boxShadow: "0 10px 30px rgba(0, 214, 214, 0.4)",
-              }}
-            >
-              {/* Shimmer Effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-
-              <span className="relative z-10 flex items-center">
-                {isLoading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    {t('verifyOTP.submitting')}
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {t('verifyOTP.submit')}
-                  </>
-                )}
-              </span>
-            </button>
-
-            {/* Resend Code */}
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => navigate('/forgot-password', { state: { email } })}
-                className="font-medium transition-colors duration-200"
-                style={{color: "#1eb5ee"}}
-                onMouseEnter={(e) => e.target.style.color = "#0ea5e9"}
-                onMouseLeave={(e) => e.target.style.color = "#1eb5ee"}
+    <AuthLayout title={t("verifyOTP.title")} description={`${t("verifyOTP.subtitle")} ${email}`}>
+      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        {successMessage && <FormAlert tone="success">{successMessage}</FormAlert>}
+        {errors.general && <FormAlert>{errors.general}</FormAlert>}
+        <div className={`auth-field ${errors.otp ? "has-error" : ""}`}>
+          <label htmlFor="auth-otp-0">{t("verifyOTP.enterCode")}</label>
+          <div className="auth-otp-inputs">
+            {otp.map((digit, index) => (
+              <input
+                key={index}
+                id={`auth-otp-${index}`}
+                ref={(node) => { inputRefs.current[index] = node; }}
+                type="text"
+                inputMode="numeric"
+                autoComplete={index === 0 ? "one-time-code" : "off"}
+                aria-label={`${t("verifyOTP.code")} ${index + 1}`}
+                aria-invalid={Boolean(errors.otp || errors.general)}
+                maxLength={1}
+                value={digit}
+                onChange={(event) => handleChange(index, event.target.value)}
+                onKeyDown={(event) => handleKeyDown(index, event)}
+                onPaste={index === 0 ? handlePaste : undefined}
                 disabled={isLoading}
-              >
-                {t('verifyOTP.resend')}
-              </button>
-            </div>
-          </form>
+              />
+            ))}
+          </div>
+          {errors.otp && <p className="auth-field__error">{errors.otp}</p>}
         </div>
-      </div>
-
-      <style>{`
-        input::placeholder {
-          color: #94a3b8 !important;
-          opacity: 1;
-        }
-        
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 40px rgba(0, 214, 214, 0.4); }
-          50% { box-shadow: 0 0 60px rgba(0, 214, 214, 0.7); }
-        }
-
-        .animate-shake {
-          animation: shake 0.5s ease-out;
-        }
-
-        .animate-pulse-glow {
-          animation: pulse-glow 2s ease-in-out infinite;
-        }
-      `}</style>
-    </div>
+        <button className="auth-submit" type="submit" disabled={isLoading}>
+          {isLoading && <span className="auth-spinner" aria-hidden="true" />}
+          {isLoading ? t("verifyOTP.submitting") : t("verifyOTP.submit")}
+        </button>
+        <div className="auth-form__meta">
+          <Link to="/forgot-password">{t("verifyOTP.back")}</Link>
+          <button type="button" onClick={() => navigate("/forgot-password", { state: { email } })} disabled={isLoading}>
+            {t("verifyOTP.resend")}
+          </button>
+        </div>
+      </form>
+    </AuthLayout>
   );
 };
 

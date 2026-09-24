@@ -1,25 +1,69 @@
 import psycopg2
+import psycopg2.extensions
+from psycopg2 import pool as pg_pool
 from psycopg2.extras import RealDictCursor
 import os
+import threading
+
+_pool = None
+_pool_lock = threading.Lock()
+
+
+class _PooledConnection(psycopg2.extensions.connection):
+    """close() hands the connection back to the pool, so existing
+    `conn = get_db_connection() ... conn.close()` call sites reuse connections."""
+    _checked_out = False
+
+    def close(self):
+        if self._checked_out:
+            self._checked_out = False
+            _pool.putconn(self)  # pool rolls back any open transaction
+        else:
+            super().close()  # pool discarding it, or never pooled
+
+
+def _get_pool():
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                size = int(os.getenv('DB_POOL_SIZE', 10))
+                kwargs = {
+                    'connection_factory': _PooledConnection,
+                    # detect connections silently dropped by Azure/NAT idle timeouts
+                    'keepalives': 1, 'keepalives_idle': 60,
+                    'keepalives_interval': 10, 'keepalives_count': 5,
+                }
+                database_url = os.getenv('DATABASE_URL')
+                if database_url:
+                    kwargs['dsn'] = database_url
+                else:
+                    kwargs.update(
+                        host=os.getenv('DB_HOST', 'localhost'),
+                        database=os.getenv('DB_NAME', 'postgres'),
+                        user=os.getenv('DB_USER', 'postgres'),
+                        password=os.getenv('DB_PASSWORD', ''),
+                        port=os.getenv('DB_PORT', 5432),
+                        sslmode=os.getenv('DB_SSLMODE', 'require'),
+                    )
+                # minconn == maxconn: psycopg2 closes returned conns beyond minconn
+                _pool = pg_pool.ThreadedConnectionPool(size, size, **kwargs)
+    return _pool
 
 
 def get_db_connection():
-    """Create a database connection"""
+    """Borrow a pooled connection. Call conn.close() to return it."""
     try:
-        database_url = os.getenv('DATABASE_URL')
-        if database_url:
-            conn = psycopg2.connect(database_url)
-            return conn
-
-        db_config = {
-            'host': os.getenv('DB_HOST', 'localhost'),
-            'database': os.getenv('DB_NAME', 'postgres'),
-            'user': os.getenv('DB_USER', 'postgres'),
-            'password': os.getenv('DB_PASSWORD', ''),
-            'port': os.getenv('DB_PORT', 5432),
-            'sslmode': os.getenv('DB_SSLMODE', 'require')
-        }
-        conn = psycopg2.connect(**db_config)
+        pool = _get_pool()
+        conn = pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute('SELECT 1')
+            conn.rollback()
+        except psycopg2.Error:
+            pool.putconn(conn, close=True)  # stale, replace it
+            conn = pool.getconn()
+        conn._checked_out = True
         return conn
     except Exception as e:
         print(f"Database connection error: {e}")

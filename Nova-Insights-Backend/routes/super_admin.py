@@ -5,7 +5,9 @@ Nordic Construction A/S - Platform Owner Access
 from flask import Blueprint, request, jsonify
 from functools import wraps
 from utils.database import get_db_connection
-from utils.token_manager import verify_access_token
+from utils.i18n import t
+from utils.token_manager import verify_access_token, revoke_user_sessions
+from utils.redis_client import cache_delete
 from psycopg2.extras import RealDictCursor
 import bcrypt
 
@@ -30,7 +32,7 @@ def super_admin_required(f):
         if not token:
             return jsonify({
                 'success': False,
-                'error': 'Unauthorized',
+                'error': t('common.unauthorized'),
                 'code': 'UNAUTHORIZED'
             }), 401
         
@@ -38,7 +40,7 @@ def super_admin_required(f):
         if error:
             return jsonify({
                 'success': False,
-                'error': 'Invalid or expired token',
+                'error': t('auth.invalid_or_expired_token'),
                 'code': 'INVALID_TOKEN'
             }), 401
         
@@ -46,7 +48,7 @@ def super_admin_required(f):
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database connection failed',
+                'error': t('common.db_connection_failed'),
                 'code': 'DB_ERROR'
             }), 500
         
@@ -61,14 +63,14 @@ def super_admin_required(f):
                 if not user:
                     return jsonify({
                         'success': False,
-                        'error': 'User not found',
+                        'error': t('user.not_found'),
                         'code': 'USER_NOT_FOUND'
                     }), 404
                 
                 if user['role'] != 'super_admin':
                     return jsonify({
                         'success': False,
-                        'error': 'Super admin access required',
+                        'error': t('auth.super_admin_required'),
                         'code': 'FORBIDDEN'
                     }), 403
                 
@@ -88,7 +90,7 @@ def get_dashboard():
     if not conn:
         return jsonify({
             'success': False,
-            'error': 'Database connection failed',
+            'error': t('common.db_connection_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     
@@ -210,7 +212,7 @@ def get_dashboard():
         print(f"Dashboard error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Failed to load dashboard',
+            'error': t('company.dashboard_load_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     finally:
@@ -238,7 +240,7 @@ def get_all_companies():
     if not conn:
         return jsonify({
             'success': False,
-            'error': 'Database connection failed',
+            'error': t('common.db_connection_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     
@@ -324,7 +326,7 @@ def get_all_companies():
         print(f"Get companies error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Failed to fetch companies',
+            'error': t('company.list_fetch_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     finally:
@@ -341,7 +343,7 @@ def create_company():
         if not data:
             return jsonify({
                 'success': False,
-                'error': 'Request data required',
+                'error': t('common.request_data_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -356,35 +358,35 @@ def create_company():
         if not name:
             return jsonify({
                 'success': False,
-                'error': 'Company name is required',
+                'error': t('company.name_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
         if not owner_email:
             return jsonify({
                 'success': False,
-                'error': 'Owner email is required',
+                'error': t('company.owner_email_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
         if not owner_password or len(owner_password) < 6:
             return jsonify({
                 'success': False,
-                'error': 'Owner password must be at least 6 characters',
+                'error': t('password.owner_min_length'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
         if not owner_first_name:
             return jsonify({
                 'success': False,
-                'error': 'Owner first name is required',
+                'error': t('company.owner_first_name_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
         if not owner_last_name:
             return jsonify({
                 'success': False,
-                'error': 'Owner last name is required',
+                'error': t('company.owner_last_name_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -392,7 +394,7 @@ def create_company():
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database connection failed',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -402,7 +404,7 @@ def create_company():
                 if cur.fetchone():
                     return jsonify({
                         'success': False,
-                        'error': 'A company with this name already exists',
+                        'error': t('company.name_exists'),
                         'code': 'NAME_EXISTS'
                     }), 400
                 
@@ -411,7 +413,7 @@ def create_company():
                     if cur.fetchone():
                         return jsonify({
                             'success': False,
-                            'error': 'Company with this email already exists',
+                            'error': t('company.email_exists'),
                             'code': 'EMAIL_EXISTS'
                         }), 400
                 
@@ -419,7 +421,7 @@ def create_company():
                 if cur.fetchone():
                     return jsonify({
                         'success': False,
-                        'error': 'A user with this owner email already exists',
+                        'error': t('company.owner_email_exists'),
                         'code': 'OWNER_EMAIL_EXISTS'
                     }), 400
                 
@@ -461,7 +463,7 @@ def create_company():
                 
                 return jsonify({
                     'success': True,
-                    'message': 'Company and owner account created successfully',
+                    'message': t('company.created_with_owner'),
                     'company': {
                         'id': new_company['id'],
                         'name': new_company['name'],
@@ -486,25 +488,25 @@ def create_company():
                 if 'email' in error_msg.lower():
                     return jsonify({
                         'success': False,
-                        'error': 'Email already exists',
+                        'error': t('user.email_in_use'),
                         'code': 'DUPLICATE_EMAIL'
                     }), 400
                 elif 'name' in error_msg.lower():
                     return jsonify({
                         'success': False,
-                        'error': 'Company name already exists',
+                        'error': t('company.name_exists'),
                         'code': 'DUPLICATE_NAME'
                     }), 400
                 else:
                     return jsonify({
                         'success': False,
-                        'error': 'A record with this information already exists',
+                        'error': t('company.record_exists'),
                         'code': 'DUPLICATE_ENTRY'
                     }), 400
             
             return jsonify({
                 'success': False,
-                'error': 'Failed to create company. Please try again.',
+                'error': t('company.create_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -514,7 +516,7 @@ def create_company():
         print(f"Create company request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Invalid request data',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400
 
@@ -529,7 +531,7 @@ def update_company(company_id):
         if not data:
             return jsonify({
                 'success': False,
-                'error': 'Request data required',
+                'error': t('common.request_data_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -537,7 +539,7 @@ def update_company(company_id):
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database connection failed',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -552,14 +554,14 @@ def update_company(company_id):
                 if not company:
                     return jsonify({
                         'success': False,
-                        'error': 'Company not found',
+                        'error': t('company.not_found'),
                         'code': 'NOT_FOUND'
                     }), 404
                 
                 if company.get('is_super_admin'):
                     return jsonify({
                         'success': False,
-                        'error': 'Cannot modify platform owner company',
+                        'error': t('company.cannot_modify_platform_owner'),
                         'code': 'FORBIDDEN'
                     }), 403
                 
@@ -590,11 +592,26 @@ def update_company(company_id):
                     company_id
                 ))
                 updated = cur.fetchone()
+                
+                # Deactivation logs out every user of the company
+                company_user_ids = []
+                if updated['is_active'] == False:
+                    cur.execute("SELECT id FROM users WHERE company_id = %s", (company_id,))
+                    company_user_ids = [row['id'] for row in cur.fetchall()]
+                    cur.execute(
+                        "UPDATE refresh_tokens SET is_revoked = TRUE WHERE user_id = ANY(%s) AND is_revoked = FALSE",
+                        (company_user_ids,)
+                    )
                 conn.commit()
+                
+                if company_user_ids:
+                    revoke_user_sessions(company_user_ids)
+                    for user_id in company_user_ids:
+                        cache_delete(f"user_profile:{user_id}")
                 
                 return jsonify({
                     'success': True,
-                    'message': 'Company updated successfully',
+                    'message': t('company.updated'),
                     'company': {
                         'id': updated['id'],
                         'name': updated['name'],
@@ -609,7 +626,7 @@ def update_company(company_id):
             print(f"Update company error: {e}")
             return jsonify({
                 'success': False,
-                'error': 'Failed to update company',
+                'error': t('company.update_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -619,7 +636,7 @@ def update_company(company_id):
         print(f"Update company request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Invalid request data',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400
 
@@ -632,7 +649,7 @@ def delete_company(company_id):
     if not conn:
         return jsonify({
             'success': False,
-            'error': 'Database connection failed',
+            'error': t('common.db_connection_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     
@@ -646,14 +663,14 @@ def delete_company(company_id):
             if not company:
                 return jsonify({
                     'success': False,
-                    'error': 'Company not found',
+                    'error': t('company.not_found'),
                     'code': 'NOT_FOUND'
                 }), 404
             
             if company.get('is_super_admin'):
                 return jsonify({
                     'success': False,
-                    'error': 'Cannot delete platform owner company',
+                    'error': t('company.cannot_delete_platform_owner'),
                     'code': 'FORBIDDEN'
                 }), 403
             
@@ -675,7 +692,7 @@ def delete_company(company_id):
             
             return jsonify({
                 'success': True,
-                'message': f'Company "{company["name"]}" and all related data deleted successfully'
+                'message': t('company.deleted_with_data', name=company['name'])
             }), 200
             
     except Exception as e:
@@ -683,7 +700,7 @@ def delete_company(company_id):
         print(f"Delete company error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Failed to delete company. Some related data may still exist.',
+            'error': t('company.delete_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     finally:
@@ -710,7 +727,7 @@ def get_company_users(company_id):
     if not conn:
         return jsonify({
             'success': False,
-            'error': 'Database connection failed',
+            'error': t('common.db_connection_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     
@@ -723,7 +740,7 @@ def get_company_users(company_id):
             if not company:
                 return jsonify({
                     'success': False,
-                    'error': 'Company not found',
+                    'error': t('company.not_found'),
                     'code': 'NOT_FOUND'
                 }), 404
             
@@ -778,7 +795,7 @@ def get_company_users(company_id):
         print(f"Get company users error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Failed to fetch users',
+            'error': t('user.list_fetch_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     finally:
@@ -808,7 +825,7 @@ def get_all_users():
     if not conn:
         return jsonify({
             'success': False,
-            'error': 'Database connection failed',
+            'error': t('common.db_connection_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     
@@ -894,7 +911,7 @@ def get_all_users():
         print(f"Get all users error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Failed to fetch users',
+            'error': t('user.list_fetch_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     finally:
@@ -911,7 +928,7 @@ def update_user(user_id):
         if not data:
             return jsonify({
                 'success': False,
-                'error': 'Request data required',
+                'error': t('common.request_data_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -919,7 +936,7 @@ def update_user(user_id):
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database connection failed',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -932,7 +949,7 @@ def update_user(user_id):
                 if not user:
                     return jsonify({
                         'success': False,
-                        'error': 'User not found',
+                        'error': t('user.not_found'),
                         'code': 'NOT_FOUND'
                     }), 404
                 
@@ -990,7 +1007,7 @@ def update_user(user_id):
                 
                 return jsonify({
                     'success': True,
-                    'message': 'User updated successfully',
+                    'message': t('user.updated'),
                     'user': {
                         'id': updated['id'],
                         'firstName': updated['first_name'],
@@ -1006,7 +1023,7 @@ def update_user(user_id):
             print(f"Update user error: {e}")
             return jsonify({
                 'success': False,
-                'error': 'Failed to update user',
+                'error': t('user.update_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -1016,7 +1033,7 @@ def update_user(user_id):
         print(f"Update user request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Invalid request data',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400
 
@@ -1029,7 +1046,7 @@ def delete_user(user_id):
     if not conn:
         return jsonify({
             'success': False,
-            'error': 'Database connection failed',
+            'error': t('common.db_connection_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     
@@ -1042,7 +1059,7 @@ def delete_user(user_id):
             if not user:
                 return jsonify({
                     'success': False,
-                    'error': 'User not found',
+                    'error': t('user.not_found'),
                     'code': 'NOT_FOUND'
                 }), 404
             
@@ -1050,7 +1067,7 @@ def delete_user(user_id):
             if user['role'] == 'super_admin':
                 return jsonify({
                     'success': False,
-                    'error': 'Cannot delete super admin user',
+                    'error': t('user.cannot_delete_super_admin'),
                     'code': 'FORBIDDEN'
                 }), 403
             
@@ -1089,7 +1106,7 @@ def delete_user(user_id):
             
             return jsonify({
                 'success': True,
-                'message': f'User "{user["email"]}" and all their data deleted successfully',
+                'message': t('user.deleted_with_data', email=user['email']),
                 'deletedData': {
                     'sessions': deleted_sessions,
                     'messages': deleted_messages,
@@ -1102,7 +1119,7 @@ def delete_user(user_id):
         print(f"Delete user error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Failed to delete user',
+            'error': t('user.delete_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
     finally:

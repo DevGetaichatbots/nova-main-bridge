@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
 from utils.database import get_db_connection
+from utils.i18n import t
 from utils.validators import validate_password
 from utils.redis_client import cache_set, cache_delete
 from middleware.auth_middleware import require_reset_token
@@ -24,7 +25,7 @@ def reset_password():
         if not data:
             return jsonify({
                 'success': False,
-                'error': 'Anmodningsdata påkrævet',
+                'error': t('common.request_data_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -34,14 +35,14 @@ def reset_password():
         if not password or not confirm_password:
             return jsonify({
                 'success': False,
-                'error': 'Adgangskode og bekræftelse af adgangskode er påkrævet',
+                'error': t('password.and_confirm_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
         if password != confirm_password:
             return jsonify({
                 'success': False,
-                'error': 'Adgangskoder matcher ikke',
+                'error': t('password.mismatch'),
                 'code': 'PASSWORD_MISMATCH'
             }), 400
         
@@ -60,7 +61,7 @@ def reset_password():
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -85,7 +86,7 @@ def reset_password():
                 if not updated_user:
                     return jsonify({
                         'success': False,
-                        'error': 'Bruger ikke fundet',
+                        'error': t('user.not_found'),
                         'code': 'USER_NOT_FOUND'
                     }), 404
                 
@@ -101,7 +102,7 @@ def reset_password():
                 
                 return jsonify({
                     'success': True,
-                    'message': 'Adgangskode ændret med succes',
+                    'message': t('password.reset_success'),
                     'data': {
                         'userId': f"user_{user_id}",
                         'passwordChangedAt': datetime.utcnow().isoformat() + 'Z'
@@ -113,7 +114,7 @@ def reset_password():
             print(f"Reset password error: {e}")
             return jsonify({
                 'success': False,
-                'error': 'Kunne ikke nulstille adgangskode',
+                'error': t('password.reset_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -123,6 +124,6 @@ def reset_password():
         print(f"Reset password request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Ugyldig anmodningsdata',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400

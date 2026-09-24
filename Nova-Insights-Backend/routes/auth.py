@@ -2,7 +2,8 @@ from flask import Blueprint, request, jsonify
 import bcrypt
 import json
 from utils.database import get_db_connection
-from utils.validators import validate_email, validate_password, validate_name
+from utils.i18n import t
+from utils.validators import validate_email
 from utils.token_manager import (
     generate_access_token, 
     generate_refresh_token, 
@@ -10,16 +11,12 @@ from utils.token_manager import (
     verify_refresh_token
 )
 from utils.audit_logger import log_audit_event
-from utils.redis_client import rate_limit_check, cache_get, cache_set, cache_delete
+from utils.redis_client import cache_get, cache_set, cache_delete
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
 
 auth_bp = Blueprint('auth', __name__)
 
-RATE_LIMIT_LOGIN = 5
-RATE_LIMIT_WINDOW = 300
-RATE_LIMIT_SIGNUP = 5
-RATE_LIMIT_SIGNUP_WINDOW = 3600
 USER_CACHE_TTL = 300
 
 
@@ -32,209 +29,16 @@ def get_cookie_settings():
     }
 
 
-@auth_bp.route('/signup', methods=['POST'])
-def signup():
-    """User registration endpoint with access + refresh tokens"""
-    try:
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'Anmodningsdata påkrævet',
-                'code': 'VALIDATION_ERROR'
-            }), 400
-        
-        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-        rate_key = f"rate_limit:signup:{client_ip}"
-        allowed, remaining, reset_time = rate_limit_check(rate_key, RATE_LIMIT_SIGNUP, RATE_LIMIT_SIGNUP_WINDOW)
-        
-        if not allowed:
-            return jsonify({
-                'success': False,
-                'error': 'For mange registreringsforsøg. Prøv igen senere.',
-                'code': 'RATE_LIMITED',
-                'retryAfter': reset_time
-            }), 429
-        
-        first_name = data.get('firstName', '').strip()
-        last_name = data.get('lastName', '').strip()
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '')
-        confirm_password = data.get('confirmPassword', '')
-        
-        is_valid, error_msg = validate_name(first_name, "Fornavn")
-        if not is_valid:
-            return jsonify({
-                'success': False,
-                'error': error_msg,
-                'code': 'VALIDATION_ERROR'
-            }), 400
-        
-        is_valid, error_msg = validate_name(last_name, "Efternavn")
-        if not is_valid:
-            return jsonify({
-                'success': False,
-                'error': error_msg,
-                'code': 'VALIDATION_ERROR'
-            }), 400
-        
-        is_valid, error_msg = validate_email(email)
-        if not is_valid:
-            return jsonify({
-                'success': False,
-                'error': error_msg,
-                'code': 'VALIDATION_ERROR'
-            }), 400
-        
-        is_valid, error_msg, requirements = validate_password(password)
-        if not is_valid:
-            return jsonify({
-                'success': False,
-                'error': error_msg,
-                'code': 'WEAK_PASSWORD',
-                'requirements': requirements
-            }), 400
-        
-        if password != confirm_password:
-            return jsonify({
-                'success': False,
-                'error': 'Adgangskoder matcher ikke',
-                'code': 'PASSWORD_MISMATCH'
-            }), 400
-        
-        conn = get_db_connection()
-        if not conn:
-            return jsonify({
-                'success': False,
-                'error': 'Database forbindelse fejlede',
-                'code': 'INTERNAL_ERROR'
-            }), 500
-        
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT id FROM users WHERE email = %s", (email,))
-                existing_user = cur.fetchone()
-                
-                if existing_user:
-                    return jsonify({
-                        'success': False,
-                        'error': 'Bruger med denne e-mail eksisterer allerede',
-                        'code': 'EMAIL_EXISTS'
-                    }), 400
-                
-                password_hash = bcrypt.hashpw(
-                    password.encode('utf-8'),
-                    bcrypt.gensalt()
-                ).decode('utf-8')
-                
-                cur.execute(
-                    """
-                    INSERT INTO users (first_name, last_name, email, password_hash)
-                    VALUES (%s, %s, %s, %s)
-                    RETURNING id, first_name, last_name, email, created_at
-                    """,
-                    (first_name, last_name, email, password_hash)
-                )
-                new_user = cur.fetchone()
-                
-                access_token = generate_access_token(new_user['id'], new_user['email'])
-                refresh_token = generate_refresh_token(new_user['id'], new_user['email'])
-                
-                refresh_token_hash = hash_token(refresh_token)
-                expires_at = datetime.utcnow() + timedelta(days=7)
-                
-                cur.execute(
-                    """
-                    INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (new_user['id'], refresh_token_hash, expires_at)
-                )
-                
-                conn.commit()
-                
-                response_data = {
-                    'success': True,
-                    'message': 'Bruger registreret med succes',
-                    'user': {
-                        'id': new_user['id'],
-                        'firstName': new_user['first_name'],
-                        'lastName': new_user['last_name'],
-                        'email': new_user['email'],
-                        'role': 'user',
-                        'createdAt': new_user['created_at'].isoformat()
-                    },
-                    'access_token': access_token
-                }
-                
-                resp = jsonify(response_data)
-                
-                cookie_settings = get_cookie_settings()
-                
-                resp.set_cookie(
-                    'accessToken',
-                    access_token,
-                    httponly=True,
-                    secure=cookie_settings['secure'],
-                    samesite=cookie_settings['samesite'],
-                    max_age=86400,
-                    path='/'
-                )
-                resp.set_cookie(
-                    'refreshToken',
-                    refresh_token,
-                    httponly=True,
-                    secure=cookie_settings['secure'],
-                    samesite=cookie_settings['samesite'],
-                    max_age=604800,
-                    path='/api/'
-                )
-                
-                return resp, 201
-                
-        except Exception as e:
-            conn.rollback()
-            print(f"Signup error: {e}")
-            return jsonify({
-                'success': False,
-                'error': 'Registrering fejlede. Prøv venligst igen',
-                'code': 'INTERNAL_ERROR'
-            }), 500
-        finally:
-            conn.close()
-            
-    except Exception as e:
-        print(f"Signup request error: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Ugyldig anmodningsdata',
-            'code': 'VALIDATION_ERROR'
-        }), 400
-
-
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """User login endpoint with access + refresh tokens"""
     try:
-        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-        rate_key = f"rate_limit:login:{client_ip}"
-        allowed, remaining, reset_time = rate_limit_check(rate_key, RATE_LIMIT_LOGIN, RATE_LIMIT_WINDOW)
-        
-        if not allowed:
-            return jsonify({
-                'success': False,
-                'error': 'For mange loginforsøg. Prøv igen senere.',
-                'code': 'RATE_LIMITED',
-                'retryAfter': reset_time
-            }), 429
-        
         data = request.get_json()
         
         if not data:
             return jsonify({
                 'success': False,
-                'error': 'Anmodningsdata påkrævet',
+                'error': t('common.request_data_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -252,7 +56,7 @@ def login():
         if not password:
             return jsonify({
                 'success': False,
-                'error': 'Adgangskode er påkrævet',
+                'error': t('password.required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -260,7 +64,7 @@ def login():
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -282,21 +86,28 @@ def login():
                 if not user:
                     return jsonify({
                         'success': False,
-                        'error': 'Ugyldig e-mail eller adgangskode',
+                        'error': t('auth.invalid_credentials'),
                         'code': 'INVALID_CREDENTIALS'
                     }), 401
                 
                 if user.get('is_active') == False:
                     return jsonify({
                         'success': False,
-                        'error': 'Account is deactivated. Contact your administrator.',
+                        'error': t('auth.account_deactivated_contact_admin'),
                         'code': 'ACCOUNT_DEACTIVATED'
+                    }), 401
+
+                if user.get('company_active') == False:
+                    return jsonify({
+                        'success': False,
+                        'error': t('auth.company_deactivated_contact_admin'),
+                        'code': 'COMPANY_DEACTIVATED'
                     }), 401
                 
                 if not bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
                     return jsonify({
                         'success': False,
-                        'error': 'Ugyldig e-mail eller adgangskode',
+                        'error': t('auth.invalid_credentials'),
                         'code': 'INVALID_CREDENTIALS'
                     }), 401
                 
@@ -343,7 +154,7 @@ def login():
                 
                 response_data = {
                     'success': True,
-                    'message': 'Login vellykket',
+                    'message': t('auth.login_success'),
                     'user': user_response,
                     'access_token': access_token
                 }
@@ -378,7 +189,7 @@ def login():
             print(f"Login error: {e}")
             return jsonify({
                 'success': False,
-                'error': 'Login fejlede. Prøv venligst igen',
+                'error': t('auth.login_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -388,7 +199,7 @@ def login():
         print(f"Login request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Ugyldig anmodningsdata',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400
 
@@ -411,7 +222,7 @@ def get_current_user():
     if not token:
         return jsonify({
             'success': False,
-            'error': 'Ikke autoriseret',
+            'error': t('common.unauthorized'),
             'code': 'UNAUTHORIZED'
         }), 401
     
@@ -422,7 +233,7 @@ def get_current_user():
         if error:
             return jsonify({
                 'success': False,
-                'error': 'Ugyldig eller udløbet token',
+                'error': t('auth.invalid_or_expired_token'),
                 'code': 'INVALID_TOKEN'
             }), 401
         
@@ -445,7 +256,7 @@ def get_current_user():
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -470,14 +281,14 @@ def get_current_user():
                 if not user:
                     return jsonify({
                         'success': False,
-                        'error': 'Bruger ikke fundet',
+                        'error': t('user.not_found'),
                         'code': 'USER_NOT_FOUND'
                     }), 404
                 
                 if user.get('is_active') == False:
                     return jsonify({
                         'success': False,
-                        'error': 'Account is deactivated',
+                        'error': t('auth.account_deactivated'),
                         'code': 'ACCOUNT_DEACTIVATED'
                     }), 401
                 
@@ -521,7 +332,7 @@ def get_current_user():
         print(f"Get current user error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Kunne ikke hente brugerprofil',
+            'error': t('user.profile_fetch_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
 
@@ -543,7 +354,7 @@ def refresh_access_token():
         if not refresh_token:
             return jsonify({
                 'success': False,
-                'error': 'Refresh token er påkrævet',
+                'error': t('auth.refresh_token_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -551,7 +362,7 @@ def refresh_access_token():
         if error:
             return jsonify({
                 'success': False,
-                'error': 'Ugyldig eller udløbet refresh token',
+                'error': t('auth.invalid_refresh_token'),
                 'code': 'INVALID_TOKEN'
             }), 401
         
@@ -561,7 +372,7 @@ def refresh_access_token():
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -580,15 +391,32 @@ def refresh_access_token():
                 if not token_record or token_record['is_revoked']:
                     return jsonify({
                         'success': False,
-                        'error': 'Token er ugyldig eller tilbagekaldt',
+                        'error': t('auth.token_invalid_or_revoked'),
                         'code': 'INVALID_TOKEN'
+                    }), 401
+
+                cur.execute(
+                    """
+                    SELECT u.is_active, c.is_active as company_active
+                    FROM users u
+                    LEFT JOIN companies c ON u.company_id = c.id
+                    WHERE u.id = %s
+                    """,
+                    (payload['user_id'],)
+                )
+                user = cur.fetchone()
+                if not user or user['is_active'] == False or user['company_active'] == False:
+                    return jsonify({
+                        'success': False,
+                        'error': t('auth.account_or_company_deactivated'),
+                        'code': 'ACCOUNT_DEACTIVATED'
                     }), 401
                 
                 new_access_token = generate_access_token(payload['user_id'], payload['email'])
                 
                 resp = jsonify({
                     'success': True,
-                    'message': 'Token opdateret'
+                    'message': t('auth.token_refreshed')
                 })
                 
                 cookie_settings = get_cookie_settings()
@@ -612,6 +440,6 @@ def refresh_access_token():
         print(f"Refresh token error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Kunne ikke opdatere token',
+            'error': t('auth.token_refresh_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500

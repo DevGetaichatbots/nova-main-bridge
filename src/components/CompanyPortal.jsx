@@ -424,45 +424,45 @@ const CompanyPortal = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-28 pb-8 px-4">
+    <div className="min-h-screen bg-gray-50 pt-20 md:pt-28 pb-8 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#1eb5ee' }}>
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-center gap-3 md:gap-4 mb-5 md:mb-8">
+          <div className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0 rounded-xl md:rounded-2xl flex items-center justify-center" style={{ background: '#1eb5ee' }}>
+            <svg className="w-6 h-6 md:w-8 md:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">{t('companyPortal.title')}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">{t('companyPortal.title')}</h1>
             <p className="text-gray-600">{company?.name || t('companyPortal.subtitle')}</p>
           </div>
         </div>
 
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1">
           <button
             onClick={() => setActiveTab('users')}
-            className={`px-6 py-3 rounded-xl font-semibold transition-all ${activeTab === 'users' ? 'text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            className={`flex-shrink-0 whitespace-nowrap px-4 py-2.5 md:px-6 md:py-3 rounded-xl text-sm md:text-base font-semibold transition-all ${activeTab === 'users' ? 'text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
             style={activeTab === 'users' ? { background: '#1eb5ee' } : {}}
           >
             {t('companyPortal.manageUsers')}
           </button>
           <button
             onClick={() => setActiveTab('company')}
-            className={`px-6 py-3 rounded-xl font-semibold transition-all ${activeTab === 'company' ? 'text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            className={`flex-shrink-0 whitespace-nowrap px-4 py-2.5 md:px-6 md:py-3 rounded-xl text-sm md:text-base font-semibold transition-all ${activeTab === 'company' ? 'text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
             style={activeTab === 'company' ? { background: '#1eb5ee' } : {}}
           >
             {t('companyPortal.companyInfo')}
           </button>
           <button
             onClick={() => setActiveTab('audit')}
-            className={`px-6 py-3 rounded-xl font-semibold transition-all ${activeTab === 'audit' ? 'text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            className={`flex-shrink-0 whitespace-nowrap px-4 py-2.5 md:px-6 md:py-3 rounded-xl text-sm md:text-base font-semibold transition-all ${activeTab === 'audit' ? 'text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
             style={activeTab === 'audit' ? { background: '#1eb5ee' } : {}}
           >
             {t('companyPortal.auditLogs')}
           </button>
           <button
             onClick={() => setActiveTab('chats')}
-            className={`px-6 py-3 rounded-xl font-semibold transition-all ${activeTab === 'chats' ? 'text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            className={`flex-shrink-0 whitespace-nowrap px-4 py-2.5 md:px-6 md:py-3 rounded-xl text-sm md:text-base font-semibold transition-all ${activeTab === 'chats' ? 'text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
             style={activeTab === 'chats' ? { background: '#1eb5ee' } : {}}
           >
             {t('companyPortal.chatHistories')}
@@ -470,21 +470,21 @@ const CompanyPortal = () => {
         </div>
 
         {activeTab === 'users' && (
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center gap-4">
+          <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <h2 className="text-xl font-bold text-gray-800">{t('admin.users')} ({pagination.total})</h2>
                 <input
                   type="text"
                   placeholder={t('admin.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#1eb5ee]/50"
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#1eb5ee]/50"
                 />
               </div>
               <button
                 onClick={() => { resetForm(); setShowAddModal(true); }}
-                className="px-6 py-3 rounded-xl text-white font-semibold flex items-center gap-2 hover:scale-105 transition-all"
+                className="px-5 py-2.5 md:px-6 md:py-3 rounded-xl text-white font-semibold flex items-center justify-center gap-2 whitespace-nowrap hover:scale-105 transition-all"
                 style={{ background: '#1eb5ee' }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,7 +625,7 @@ const CompanyPortal = () => {
         )}
 
         {activeTab === 'company' && company && (
-          <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-6">{t('companyPortal.companyDetails')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -669,12 +669,12 @@ const CompanyPortal = () => {
         )}
 
         {activeTab === 'audit' && (
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
               <h2 className="text-xl font-bold text-gray-800">{t('companyPortal.auditLogs')}</h2>
               <button
                 onClick={handleExportAuditLogs}
-                className="px-6 py-3 rounded-xl text-white font-semibold flex items-center gap-2 hover:scale-105 transition-all"
+                className="px-5 py-2.5 md:px-6 md:py-3 rounded-xl text-white font-semibold flex items-center justify-center gap-2 whitespace-nowrap hover:scale-105 transition-all"
                 style={{ background: '#1eb5ee' }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -684,14 +684,14 @@ const CompanyPortal = () => {
               </button>
             </div>
             
-            <div className="flex flex-wrap gap-4 mb-6">
-              <div className="relative">
+            <div className="flex flex-wrap gap-3 md:gap-4 mb-6">
+              <div className="relative w-full sm:w-auto">
                 <input
                   type="text"
                   value={auditUserSearch}
                   onChange={(e) => { setAuditUserSearch(e.target.value); setAuditPagination(p => ({ ...p, page: 1 })); }}
                   placeholder={t('companyPortal.searchByUserEmail')}
-                  className="px-4 py-2 pl-10 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#1eb5ee]/50 w-64"
+                  className="px-4 py-2 pl-10 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#1eb5ee]/50 w-full sm:w-64"
                 />
                 <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -822,12 +822,12 @@ const CompanyPortal = () => {
         )}
 
         {activeTab === 'chats' && (
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
               <h2 className="text-xl font-bold text-gray-800">{t('companyPortal.chatHistories')}</h2>
               <button
                 onClick={handleExportChatHistories}
-                className="px-6 py-3 rounded-xl text-white font-semibold flex items-center gap-2 hover:scale-105 transition-all"
+                className="px-5 py-2.5 md:px-6 md:py-3 rounded-xl text-white font-semibold flex items-center justify-center gap-2 whitespace-nowrap hover:scale-105 transition-all"
                 style={{ background: '#1eb5ee' }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -838,7 +838,7 @@ const CompanyPortal = () => {
             </div>
 
             <div className="flex flex-wrap gap-4 mb-6">
-              <div className="relative flex-1 max-w-sm">
+              <div className="relative flex-1 min-w-0 sm:max-w-sm">
                 <input
                   type="text"
                   value={chatSearchQuery}

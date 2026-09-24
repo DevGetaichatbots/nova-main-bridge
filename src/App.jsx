@@ -19,6 +19,7 @@ import AdminRoute from "./components/AdminRoute";
 import CompanyOwnerRoute from "./components/CompanyOwnerRoute";
 import SuperAdminRoute from "./components/SuperAdminRoute";
 import Login from "./components/Login";
+import LandingPage from "./pages/LandingPage";
 
 // Lazy-loaded: only downloaded when user actually navigates to that route
 const ChatWidget = lazy(() => import("./components/ChatWidget"));
@@ -32,7 +33,6 @@ const SuperAdminPortal = lazy(() => import("./components/SuperAdminPortal"));
 const UpdateProfile = lazy(() => import("./components/UpdateProfile"));
 const Support = lazy(() => import("./components/Support"));
 const Signup = lazy(() => import("./components/Signup"));
-const CompanySignup = lazy(() => import("./components/CompanySignup"));
 const ForgotPassword = lazy(() => import("./components/ForgotPassword"));
 const VerifyOTP = lazy(() => import("./components/VerifyOTP"));
 const ResetPassword = lazy(() => import("./components/ResetPassword"));
@@ -1049,6 +1049,10 @@ const SavedFilesSection = ({ sessionId }) => {
 
 function App() {
   const [isLoaded, setIsLoaded] = useState(false);
+  const isPublicLanding =
+    typeof window !== "undefined" &&
+    window.location.pathname === "/" &&
+    !isRestrictedSubdomain();
   const hasStoredUser =
     typeof window !== "undefined" && Boolean(localStorage.getItem("user"));
   // Initialize sessionId and isChatWidgetOpen from localStorage for persistence across refreshes
@@ -1073,6 +1077,8 @@ function App() {
   // Preload Chat and Schedule Risk chunks in the background after mount.
   // requestIdleCallback fires when the browser is idle; setTimeout is the fallback.
   useEffect(() => {
+    if (isPublicLanding) return;
+
     if (typeof requestIdleCallback !== 'undefined') {
       const id = requestIdleCallback(preloadCriticalRoutes);
       return () => cancelIdleCallback(id);
@@ -1084,12 +1090,16 @@ function App() {
 
   // Persist chat state to localStorage for browser refresh persistence
   useEffect(() => {
+    if (isPublicLanding) return;
+
     if (sessionId) {
       localStorage.setItem('currentChatSessionId', sessionId);
     }
   }, [sessionId]);
   
   useEffect(() => {
+    if (isPublicLanding) return;
+
     localStorage.setItem('isChatWidgetOpen', isChatWidgetOpen.toString());
   }, [isChatWidgetOpen]);
 
@@ -1358,6 +1368,12 @@ function App() {
   // Initialize session on mount
   useEffect(() => {
     const initializeSession = async () => {
+      if (isPublicLanding) {
+        updateUserFromStorage();
+        setIsLoaded(true);
+        return;
+      }
+
       try {
         const loggedInUser = localStorage.getItem("user");
         if (loggedInUser) {
@@ -1489,7 +1505,11 @@ function App() {
 
     // Listen for auth changes from other components
     const handleAuthChange = () => {
-      handleUserStateChange();
+      if (isPublicLanding) {
+        updateUserFromStorage();
+      } else {
+        handleUserStateChange();
+      }
     };
 
     window.addEventListener("authChange", handleAuthChange);
@@ -2306,15 +2326,7 @@ function App() {
                   replace
                 />
               ) : (
-                <ProtectedRoute>
-                  <div className="min-h-screen flex flex-col">
-                    <Navbar user={user} setUser={setUser} />
-                    <div className="flex-1">
-                      <HomePage />
-                    </div>
-                    <Footer />
-                  </div>
-                </ProtectedRoute>
+                <LandingPage user={user} />
               )
             }
           />
@@ -2481,7 +2493,7 @@ function App() {
             path="/company-signup"
             element={
               <RestrictedSubdomainRedirect path="/company-signup">
-                <CompanySignup setUser={setUser} />
+                <Navigate to="/signup" replace />
               </RestrictedSubdomainRedirect>
             }
           />

@@ -152,6 +152,22 @@
     "files": "Filer",
     "readOnlyNoAccess": "Skrivebeskyttede brugere kan ikke udføre denne handling"
   },
+  "auth": {
+    "homeLabel": "Nova Insight-forside",
+    "backHome": "Tilbage til forsiden",
+    "storyLabel": "Derfor bruger teams Nova Insight",
+    "eyebrow": "Tidsplansindsigt",
+    "storyTitle": "Gør ændringer i tidsplanen til klare beslutninger.",
+    "storyDescription": "Sammenlign komplekse tidsplaner, forstå konsekvenserne, og del den viden dit team har brug for.",
+    "benefitChanges": "Se alle væsentlige ændringer i tidsplanen",
+    "benefitRisks": "Find forsinkelser og risici på kritisk vej",
+    "benefitReports": "Opret klare, professionelle rapporter",
+    "secure": "Sikker behandling",
+    "azure": "Microsoft Azure",
+    "gdpr": "GDPR-kompatibel",
+    "showPassword": "Vis adgangskode",
+    "hidePassword": "Skjul adgangskode"
+  },
   "login": {
     "title": "Log ind",
     "welcomeBack": "Velkommen tilbage",
@@ -193,6 +209,8 @@
     "emailPlaceholder": "anders@eksempel.dk",
     "emailRequired": "E-mail er påkrævet",
     "emailInvalid": "E-mail er ugyldig",
+    "ownerEmail": "Ejerens e-mailadresse",
+    "ownerEmailHint": "Denne person administrerer virksomhedskontoen og inviterer teammedlemmer.",
     "password": "Adgangskode",
     "passwordPlaceholder": "Opret en stærk adgangskode",
     "passwordRequired": "Adgangskode er påkrævet",
@@ -205,6 +223,11 @@
     "acceptTerms": "Du skal acceptere vilkår og betingelser",
     "termsLabel": "Jeg accepterer vilkår og betingelser",
     "passwordStrength": "Adgangskodens styrke",
+    "passwordRequirementsTitle": "Din adgangskode skal have:",
+    "requirementLength": "Mindst 8 tegn",
+    "requirementLowercase": "Et lille bogstav",
+    "requirementUppercase": "Et stort bogstav",
+    "requirementNumber": "Et tal",
     "strengthWeak": "Svag",
     "strengthFair": "Rimelig",
     "strengthGood": "God",
@@ -214,6 +237,10 @@
     "submitting": "Opretter konto...",
     "hasAccount": "Har du allerede en konto?",
     "loginLink": "Log ind",
+    "termsPrefix": "Jeg accepterer",
+    "termsLink": "servicevilkårene",
+    "termsAnd": "og",
+    "privacyLink": "privatlivspolitikken",
     "signupSuccess": "Konto oprettet",
     "signupError": "Der opstod en fejl under oprettelse",
     "networkError": "Network connection failed. Please check if both frontend and backend are running.",
@@ -688,9 +715,7 @@
     "companyWebsite": "Hjemmeside",
     "submit": "Registrer Virksomhed",
     "submitting": "Registrerer...",
-    "signupError": "Registrering mislykkedes. Prøv venligst igen.",
-    "individualSignup": "Vil du tilmelde dig som privatperson?",
-    "signupHere": "Tilmeld dig her"
+    "signupError": "Registrering mislykkedes. Prøv venligst igen."
   },
   "companyPortal": {
     "title": "Virksomhedsportal",
@@ -1067,6 +1092,157 @@
     "companyInfoDesc": "Nordic AI Group ApS - Enterprise løsninger til byggebranchen",
     "location": "København, Danmark",
     "backToHome": "Tilbage til forsiden"
+  },
+  "landing": {
+    "skipLink": "Spring til indhold",
+    "nav": {
+      "homeLabel": "Nova Insight-forside",
+      "primaryLabel": "Primær navigation",
+      "mobileLabel": "Mobilnavigation",
+      "menuLabel": "Åbn eller luk navigationsmenuen",
+      "features": "Funktioner",
+      "pricing": "Priser",
+      "security": "Sikkerhed",
+      "faq": "FAQ",
+      "contact": "Kontakt",
+      "login": "Log ind",
+      "getStarted": "Kom i gang",
+      "dashboard": "Åbn dashboard"
+    },
+    "hero": {
+      "eyebrow": "Intelligens til byggetidsplaner",
+      "titleStart": "Sammenlign byggetidsplaner",
+      "titleAccent": "på få minutter",
+      "description": "Upload to tidsplaner, og lad Nova straks vise dig, hvad der er ændret, hvad der betyder noget, og hvad du skal gøre nu.",
+      "benefits": {
+        "tools": "Fungerer med Primavera, Microsoft Project og flere",
+        "detection": "Tydelig ændringsregistrering og visuelle rapporter",
+        "simplicity": "Ingen installation. Ingen integration. Ingen kompleksitet."
+      }
+    },
+    "upload": {
+      "title": "Upload dine tidsplaner",
+      "instruction": "Træk og slip dine filer her, eller vælg filer for at fortsætte",
+      "button": "Vælg filer",
+      "formats": "Understøtter .xer, .mpp, .pdf og flere",
+      "security": "Log sikkert ind, før dine filer uploades"
+    },
+    "integrations": {
+      "label": "Understøttede planlægningsværktøjer",
+      "trusted": "Velkendte værktøjer, gennemprøvede arbejdsgange",
+      "more": "Og mange flere"
+    },
+    "howItWorks": {
+      "title": "Sådan fungerer det",
+      "description": "Fra upload til beslutningsklare indsigter i tre enkle trin.",
+      "steps": {
+        "upload": { "title": "Upload", "description": "Tilføj den tidligere og den aktuelle version af din tidsplan." },
+        "analyze": { "title": "Vi analyserer", "description": "Nova sammenligner begge filer og finder alle væsentlige ændringer." },
+        "insights": { "title": "Få indsigt", "description": "Modtag en tydelig rapport med påvirkninger, risici og hovedpointer." }
+      }
+    },
+    "benefits": {
+      "eyebrow": "Bygget til projektstyring",
+      "titleStart": "Gør komplekse tidsplaner til",
+      "titleAccent": "klare svar",
+      "description": "Nova Insight hjælper projektledere, rådgivere, entreprenører og bygherrer med at spare timers manuelt arbejde ved at sammenligne tidsplansrevisioner og fremhæve det vigtigste.",
+      "items": {
+        "changes": "Se præcist, hvad der er ændret",
+        "risks": "Identificer forsinkelser, risici og påvirkning af kritisk vej",
+        "reports": "Opret en professionel PDF-rapport",
+        "tools": "Arbejd med de planlægningsværktøjer, du allerede bruger"
+      },
+      "cta": "Start sammenligning nu",
+      "note": "Intet betalingskort kræves til Free-planen"
+    },
+    "preview": {
+      "ariaLabel": "Eksempel på et sammenligningsresultat",
+      "dashboard": "Dashboard",
+      "comparisons": "Sammenligninger",
+      "title": "Sammenligningsresultat",
+      "report": "Download PDF-rapport",
+      "metrics": {
+        "changed": { "value": "247", "label": "Aktiviteter ændret" },
+        "added": { "value": "18", "label": "Aktiviteter tilføjet" },
+        "removed": { "value": "12", "label": "Aktiviteter fjernet" },
+        "critical": { "value": "5", "label": "Kritiske ændringer" }
+      },
+      "table": { "activity": "Aktivitet", "change": "Ændring", "impact": "Påvirkning" },
+      "rows": {
+        "foundation": { "activity": "Fundamentsarbejde", "change": "Ændret", "impact": "+14 dage", "tone": "modified" },
+        "steel": { "activity": "Stålkonstruktion", "change": "Ændret", "impact": "+7 dage", "tone": "modified" },
+        "facade": { "activity": "Facademontage", "change": "Tilføjet", "impact": "—", "tone": "added" },
+        "mep": { "activity": "Første installationer", "change": "Ændret", "impact": "+15 dage", "tone": "modified" },
+        "commissioning": { "activity": "Idriftsættelse", "change": "Uændret", "impact": "—", "tone": "neutral" }
+      },
+      "tabs": { "summary": "Overblik", "changed": "Ændret", "added": "Tilføjet", "critical": "Kritisk vej" }
+    },
+    "security": {
+      "title": "Sikkerhed på enterprise-niveau",
+      "description": "Dine data behandles sikkert på Microsoft Azure. Filer deles aldrig, og data håndteres inden for EU-kompatible rammer.",
+      "compliant": "Kompatibel",
+      "ready": "Klar"
+    },
+    "pricing": {
+      "title": "Enkle og gennemsigtige priser",
+      "description": "Vælg den plan, der passer til dine behov. Opgrader eller nedgrader når som helst.",
+      "billingLabel": "Faktureringsperiode",
+      "monthly": "Månedligt",
+      "yearly": "Årligt",
+      "save": "Spar 20 %",
+      "popular": "Mest populær",
+      "month": "måned",
+      "year": "år",
+      "comparisonCount_one": "{{count}} sammenligning",
+      "comparisonCount_other": "{{count}} sammenligninger pr. måned",
+      "getStarted": "Kom i gang",
+      "billedYearly": "Faktureres årligt",
+      "features": {
+        "basicReport": "Basisrapport",
+        "standardSupport": "Standardsupport",
+        "fullPdfReport": "Fuld PDF-rapport",
+        "emailSupport": "E-mailsupport",
+        "advancedReports": "Avancerede rapporter",
+        "prioritySupport": "Prioriteret support",
+        "teamAccounts": "Teamkonti"
+      },
+      "plans": {
+        "free": { "name": "Free", "audience": "Prøv Nova Insight" },
+        "starter": { "name": "Starter", "audience": "Til individuelle brugere" },
+        "professional": { "name": "Professional", "audience": "Til faste brugere" },
+        "business": { "name": "Business", "audience": "Til teams" }
+      }
+    },
+    "faq": {
+      "eyebrow": "Praktiske svar",
+      "title": "Ofte stillede spørgsmål",
+      "description": "Det teams har brug for at vide før den første sammenligning.",
+      "items": {
+        "formats": { "question": "Hvilke tidsplansformater understøttes?", "answer": "Nova Insight understøtter almindelige planlægningsformater som XER, MPP og PDF samt flere formater i sammenligningsværktøjet." },
+        "comparison": { "question": "Hvordan fungerer sammenligningen?", "answer": "Upload en tidligere og en aktuel tidsplan. Nova sammenholder aktiviteterne, finder revisioner og viser ændringer, tidsmæssige påvirkninger og risici i en struktureret rapport." },
+        "security": { "question": "Hvordan håndteres vores tidsplansdata?", "answer": "Filer behandles sikkert på Microsoft Azure inden for EU-kompatible rammer og deles ikke med tredjeparter." },
+        "reports": { "question": "Kan jeg eksportere resultaterne?", "answer": "Ja. Understøttede planer omfatter professionelle PDF-rapporter, så resultater kan deles med projektets interessenter." },
+        "freePlan": { "question": "Hvad indeholder Free-planen?", "answer": "Free-planen indeholder én sammenligning, en basisrapport og standardsupport. Intet betalingskort kræves for at starte." },
+        "installation": { "question": "Skal jeg installere eller integrere noget?", "answer": "Nej. Nova Insight kører i browseren, så teams kan begynde uden installation af software eller opsætning af en integration." }
+      }
+    },
+    "finalCta": {
+      "eyebrow": "Din næste revision kan blive tydeligere",
+      "title": "Spar tid. Reducer risiko. Skab klarhed.",
+      "description": "Bliv en del af de projektprofessionelle, der bruger Nova Insight til at forstå hver ændring.",
+      "button": "Start gratis",
+      "note": "Intet betalingskort kræves"
+    },
+    "footer": {
+      "description": "Klarere beslutninger om byggetidsplaner – fra revision til rapport.",
+      "productLabel": "Produktlinks",
+      "legalLabel": "Juridiske links",
+      "product": "Produkt",
+      "legal": "Juridisk",
+      "contact": "Kontakt",
+      "location": "København, Danmark",
+      "azure": "Sikkert bygget på Microsoft Azure"
+    }
   },
   "scheduleAnalysis": {
     "analysis": "Analyse",

@@ -198,7 +198,7 @@ const Navbar = ({ setUser: setAppUser }) => {
         background: "#ffffff",
       }}
     >
-      <div className="w-full px-6">
+      <div className="w-full px-4 lg:px-6">
         <div className="grid grid-cols-[auto_1fr_auto] items-center h-14">
           {/* Logo Section - Logo Only */}
           <Link to={homeRoute} className="group flex items-center flex-shrink-0">
@@ -206,7 +206,7 @@ const Navbar = ({ setUser: setAppUser }) => {
               <img
                 src="/NordicLogo2.png"
                 alt="Nordic AI Group Logo"
-                className="h-12 w-auto object-contain"  // was h-8
+                className="h-8 lg:h-12 w-auto object-contain"
               />
             </div>
           </Link>
@@ -605,7 +605,7 @@ const Navbar = ({ setUser: setAppUser }) => {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden group p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-300"
+            className="lg:hidden group p-1.5 rounded-lg hover:bg-gray-100 transition-all duration-300"
             style={{ background: "#ffffff" }}
           >
             <div className="w-6 h-6 relative">
@@ -632,14 +632,21 @@ const Navbar = ({ setUser: setAppUser }) => {
         {/* Mobile Menu — fixed overlay via portal */}
         {isMobileMenuOpen && createPortal(
           <div className="fixed inset-0 z-[9998] lg:hidden">
-            {/* Backdrop */}
-            <div
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setIsMobileMenuOpen(false)}
-            />
-            {/* Slide-in panel */}
-            <div className="absolute top-0 left-0 right-0 bg-white shadow-xl max-h-[80vh] overflow-y-auto animate-slideDown">
-              <div className="py-4 space-y-1 px-4">
+            {/* Full-screen panel */}
+            <div className="absolute inset-0 flex flex-col bg-white overflow-y-auto animate-slideDown">
+              <div className="sticky top-0 z-10 flex items-center justify-between h-14 px-4 bg-white border-b border-gray-100">
+                <img src="/NordicLogo2.png" alt="Nordic AI Group Logo" className="h-8 w-auto object-contain" />
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 transition-all duration-300"
+                  aria-label={t('common.close')}
+                >
+                  <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex-1 flex flex-col py-4 space-y-1 px-4">
             {/* Home Link - Mobile */}
             {!restrictedSubdomain && (
               <Link
@@ -839,9 +846,11 @@ const Navbar = ({ setUser: setAppUser }) => {
               <LanguageSwitcher />
             </div>
 
+            {/* Account block pinned to the bottom of the menu */}
+            <div className="pt-4 border-t border-gray-200 space-y-1" style={{ marginTop: 'auto' }}>
             {user ? (
               <>
-                <div className="px-6 py-3 border-b border-gray-200">
+                <div className="px-6 py-3">
                   <div className="flex items-center gap-3">
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
@@ -897,6 +906,7 @@ const Navbar = ({ setUser: setAppUser }) => {
                 </Link>
               </>
             )}
+            </div>
               </div>
             </div>
           </div>,

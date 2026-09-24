@@ -126,7 +126,7 @@ def cache_exists(key):
 def rate_limit_check(key, limit, window_seconds):
     """
     Check and update rate limit for a given key.
-    Uses sliding window rate limiting.
+    Uses fixed window rate limiting.
     
     Args:
         key: The rate limit key (e.g., "rate_limit:user:123")
@@ -141,23 +141,20 @@ def rate_limit_check(key, limit, window_seconds):
         return (True, limit, 0)
     
     try:
-        current = client.get(key)
-        
-        if current is None:
-            client.set(key, 1, ex=window_seconds)
-            return (True, limit - 1, window_seconds)
-        
-        count = int(current)
-        
-        if count >= limit:
+        # Fixed window: atomic INCR, expiry set on first hit (1 round-trip on the hot path).
+        count = int(client.incr(key))
+        if count == 1:
+            client.expire(key, window_seconds)
+
+        if count > limit:
             ttl = client.ttl(key)
-            return (False, 0, ttl if ttl > 0 else window_seconds)
-        
-        client.incr(key)
-        remaining = limit - count - 1
-        ttl = client.ttl(key)
-        
-        return (True, remaining, ttl if ttl > 0 else window_seconds)
+            if ttl < 0:
+                # Expiry never landed (e.g. EXPIRE failed); re-arm so the key can't block forever.
+                client.expire(key, window_seconds)
+                ttl = window_seconds
+            return (False, 0, ttl)
+
+        return (True, limit - count, window_seconds)
     except Exception as e:
         print(f"Rate limit check error: {e}")
         return (True, limit, 0)

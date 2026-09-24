@@ -6,7 +6,6 @@ import { exportDashboardPdfViaServer } from '../utils/exportPdf';
 import { buildDashboardShareUrl, copyTextToClipboard } from '../utils/shareLinks';
 import FileComparisonModal from './FileComparisonModal';
 import AnalysisPageShell from './AnalysisPageShell';
-import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
 import ReviewQueuePanel from './ReviewQueuePanel';
 import SourceViewerModal from './SourceViewerModal';
 
@@ -140,8 +139,17 @@ const ComparisonAnalysis = ({ user }) => {
     return () => clearInterval(timer);
   }, [isProcessing]);
 
+  // Guards against spamming "New": the ref blocks rapid clicks before re-render,
+  // and an untouched comparison (no files yet) is reused instead of creating another.
+  const isCreatingRef = useRef(false);
   const handleNewComparison = async () => {
-    if (isCreating) return;
+    if (isCreatingRef.current) return;
+    if (activeComparison && !activeComparison.old_filename && !activeComparison.new_filename && (!activeComparison.status || activeComparison.status === 'pending')) {
+      if (!uploadSessionId) setUploadSessionId(chatService.generateSessionId());
+      setShowUploadModal(true);
+      return;
+    }
+    isCreatingRef.current = true;
     setIsCreating(true);
     setError(null);
     try {
@@ -166,6 +174,7 @@ const ComparisonAnalysis = ({ user }) => {
     } catch (err) {
       setError(err.message || 'Failed to create comparison');
     } finally {
+      isCreatingRef.current = false;
       setIsCreating(false);
     }
   };
@@ -553,21 +562,18 @@ const ComparisonAnalysis = ({ user }) => {
 
   return (
     <AnalysisPageShell
-      sidebar={(
-        <ScheduleAnalysisSidebar
-          analyses={sidebarItems}
-          activeAnalysisId={activeComparisonId}
-          onSelectAnalysis={setActiveComparisonId}
-          onNewAnalysis={handleNewComparison}
-          onDeleteAnalysis={handleDeleteComparison}
-          onRenameAnalysis={handleRenameComparison}
-          onShareAnalysis={handleShareComparison}
-          isLoadingList={isLoadingList}
-          isCreating={isCreating}
-          isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
-        />
-      )}
+      sidebarProps={{
+        analyses: sidebarItems,
+        activeAnalysisId: activeComparisonId,
+        onSelectAnalysis: setActiveComparisonId,
+        onNewAnalysis: handleNewComparison,
+        onDeleteAnalysis: handleDeleteComparison,
+        onRenameAnalysis: handleRenameComparison,
+        onShareAnalysis: handleShareComparison,
+        isLoadingList: isLoadingList,
+        isCreating: isCreating,
+        onToggle: () => setSidebarOpen(!sidebarOpen),
+      }}
       sidebarOpen={sidebarOpen}
       onOpenSidebar={() => setSidebarOpen(true)}
       errorBanner={error && (

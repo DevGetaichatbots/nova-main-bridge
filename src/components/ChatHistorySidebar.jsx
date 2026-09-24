@@ -49,6 +49,7 @@ const ChatHistorySidebar = ({
   onSessionsLoaded,
   updatedSessionInfo = null,
   forceUpdateKey = 0,
+  embedded = false,
 }) => {
   const { t } = useTranslation();
   const [sessions, setSessions] = useState(() => 
@@ -184,7 +185,7 @@ const ChatHistorySidebar = ({
       const response = await deleteWithAuth(`/api/chat/sessions/${sessionId}`);
       const data = await response.json();
       
-      if (data.success || data.error === 'Session not found') {
+      if (data.success || response.status === 404) {
         removeFromLocalState();
       }
     } catch (error) {
@@ -319,13 +320,13 @@ const ChatHistorySidebar = ({
 
   return (
     <div 
-      className="h-full flex flex-shrink-0 relative"
-      style={{ width: isOpen ? sidebarWidth : 0 }}
+      className={embedded ? 'flex-1 min-h-0 flex flex-col' : 'h-full flex flex-shrink-0 relative'}
+      style={{ width: embedded ? '100%' : isOpen ? sidebarWidth : 0 }}
     >
       {isOpen && (
         <div 
-          className="h-full bg-white border-r border-gray-200 flex flex-col overflow-hidden"
-          style={{ width: sidebarWidth }}
+          className={`${embedded ? 'flex-1 min-h-0' : 'h-full border-r border-gray-200'} bg-white flex flex-col overflow-hidden`}
+          style={{ width: embedded ? '100%' : sidebarWidth }}
         >
           <div className="p-3 border-b border-gray-100" style={{ background: 'linear-gradient(135deg, #1eb5ee 0%, #00B8B8 100%)' }}>
             <h2 className="text-base font-semibold text-white flex items-center gap-2">
@@ -529,7 +530,7 @@ const ChatHistorySidebar = ({
         </div>
       )}
       
-      {isOpen && (
+      {isOpen && !embedded && (
         <div
           className={`absolute right-0 top-0 h-full w-1 cursor-col-resize z-10 group ${isResizing ? 'bg-[#1eb5ee]' : 'hover:bg-[#1eb5ee]/50'}`}
           onMouseDown={onResizeStart}
@@ -545,6 +546,7 @@ const ChatHistorySidebar = ({
         </div>
       )}
       
+      {!embedded && (
       <button
         onClick={onToggle}
         className={`absolute top-1/2 -translate-y-1/2 z-20 w-5 h-10 flex items-center justify-center rounded-r-lg shadow-md transition-all duration-200 hover:shadow-lg ${
@@ -562,6 +564,7 @@ const ChatHistorySidebar = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </button>
+      )}
     </div>
   );
 };

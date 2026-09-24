@@ -7,6 +7,7 @@ from flask import request, jsonify
 import jwt
 import os
 from utils.database import get_db_connection
+from utils.i18n import t
 from psycopg2.extras import RealDictCursor
 
 JWT_SECRET = os.getenv('JWT_SECRET')
@@ -94,7 +95,7 @@ def admin_required(f):
         if role != 'admin':
             return jsonify({
                 'success': False,
-                'error': 'Admin adgang påkrævet',
+                'error': t('auth.admin_required'),
                 'code': 'FORBIDDEN'
             }), 403
         

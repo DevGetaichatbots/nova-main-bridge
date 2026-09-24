@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify
 from utils.database import get_db_connection
+from utils.i18n import t
 from utils.validators import validate_email, validate_otp
 from utils.token_manager import generate_reset_token
-from utils.redis_client import rate_limit_check
 from datetime import datetime
 from psycopg2.extras import RealDictCursor
 
@@ -21,21 +21,9 @@ def verify_otp():
         if not data:
             return jsonify({
                 'success': False,
-                'error': 'Anmodningsdata påkrævet',
+                'error': t('common.request_data_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
-        
-        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-        rate_key = f"rate_limit:verify_otp:{client_ip}"
-        allowed, remaining, reset_time = rate_limit_check(rate_key, 5, 900)
-        
-        if not allowed:
-            return jsonify({
-                'success': False,
-                'error': 'For mange OTP-forsøg. Prøv igen senere.',
-                'code': 'RATE_LIMITED',
-                'retryAfter': reset_time
-            }), 429
         
         email = data.get('email', '').strip().lower()
         otp = data.get('otp', '').strip()
@@ -60,7 +48,7 @@ def verify_otp():
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -72,7 +60,7 @@ def verify_otp():
                 if not user:
                     return jsonify({
                         'success': False,
-                        'error': 'E-mail ikke fundet',
+                        'error': t('otp.email_not_found'),
                         'code': 'EMAIL_NOT_FOUND'
                     }), 404
                 
@@ -91,21 +79,21 @@ def verify_otp():
                 if not otp_record:
                     return jsonify({
                         'success': False,
-                        'error': 'Ugyldig OTP',
+                        'error': t('otp.invalid'),
                         'code': 'INVALID_OTP'
                     }), 400
                 
                 if otp_record['is_used']:
                     return jsonify({
                         'success': False,
-                        'error': 'OTP er allerede blevet brugt',
+                        'error': t('otp.already_used'),
                         'code': 'OTP_ALREADY_USED'
                     }), 400
                 
                 if datetime.utcnow() > otp_record['expires_at']:
                     return jsonify({
                         'success': False,
-                        'error': 'OTP er udløbet',
+                        'error': t('otp.expired'),
                         'code': 'OTP_EXPIRED'
                     }), 410
                 
@@ -123,7 +111,7 @@ def verify_otp():
                 
                 return jsonify({
                     'success': True,
-                    'message': 'OTP verificeret',
+                    'message': t('otp.verified'),
                     'data': {
                         'resetToken': reset_token,
                         'expiresIn': 900
@@ -135,7 +123,7 @@ def verify_otp():
             print(f"Verify OTP error: {e}")
             return jsonify({
                 'success': False,
-                'error': 'Kunne ikke behandle anmodningen',
+                'error': t('common.process_request_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -145,6 +133,6 @@ def verify_otp():
         print(f"Verify OTP request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Ugyldig anmodningsdata',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400

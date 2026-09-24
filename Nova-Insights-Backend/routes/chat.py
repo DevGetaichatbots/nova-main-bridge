@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from utils.database import get_db_connection
+from utils.i18n import t
 from utils.token_manager import decode_token
 from utils.audit_logger import log_audit_event
 from utils.redis_client import cache_get, cache_set, cache_delete
@@ -8,7 +9,7 @@ from datetime import datetime
 import os
 import secrets
 import json
-import requests as http_requests
+from utils import agent_http as http_requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -133,7 +134,7 @@ def invalidate_sessions_cache(user_id, company_id=None):
 def get_sessions():
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 20, type=int)
@@ -152,7 +153,7 @@ def get_sessions():
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -228,7 +229,7 @@ def get_sessions():
             return jsonify(response_data)
     except Exception as e:
         print(f"Error fetching sessions: {e}")
-        return jsonify({'success': False, 'error': 'Failed to fetch sessions'}), 500
+        return jsonify({'success': False, 'error': t('chat.sessions_fetch_failed')}), 500
     finally:
         conn.close()
 
@@ -237,7 +238,7 @@ def get_sessions():
 def create_session():
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     data = request.get_json() or {}
     
@@ -255,7 +256,7 @@ def create_session():
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -333,7 +334,7 @@ def create_session():
         error_str = str(e)
         print(f"Error creating session: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Failed to create session'}), 500
+        return jsonify({'success': False, 'error': t('chat.session_create_failed')}), 500
     finally:
         conn.close()
 
@@ -342,11 +343,11 @@ def create_session():
 def get_session(session_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -362,14 +363,14 @@ def get_session(session_id):
             
             session = cur.fetchone()
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             is_owner = session['user_id'] == user['user_id']
             is_company_admin = user_role in ['company_owner', 'admin'] and session['company_id'] == user_company_id
             is_super_admin = user_role == 'super_admin'
             
             if not (is_owner or is_company_admin or is_super_admin):
-                return jsonify({'success': False, 'error': 'Access denied'}), 403
+                return jsonify({'success': False, 'error': t('common.access_denied')}), 403
             
             cur.execute("""
                 SELECT * FROM chat_session_files 
@@ -387,7 +388,7 @@ def get_session(session_id):
             })
     except Exception as e:
         print(f"Error fetching session: {e}")
-        return jsonify({'success': False, 'error': 'Failed to fetch session'}), 500
+        return jsonify({'success': False, 'error': t('chat.session_fetch_failed')}), 500
     finally:
         conn.close()
 
@@ -404,7 +405,7 @@ def invalidate_messages_cache(session_id):
 def get_messages(session_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     cache_key = f"messages:{session_id}"
     cached_data = cache_get(cache_key)
@@ -418,7 +419,7 @@ def get_messages(session_id):
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -434,14 +435,14 @@ def get_messages(session_id):
             
             session = cur.fetchone()
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             is_owner = session['user_id'] == user['user_id']
             is_company_admin = user_role in ['company_owner', 'admin'] and session['company_id'] == user_company_id
             is_super_admin = user_role == 'super_admin'
             
             if not (is_owner or is_company_admin or is_super_admin):
-                return jsonify({'success': False, 'error': 'Access denied'}), 403
+                return jsonify({'success': False, 'error': t('common.access_denied')}), 403
             
             cur.execute("""
                 SELECT id, sender_type, content, content_type, is_html, metadata, created_at
@@ -474,7 +475,7 @@ def get_messages(session_id):
             return jsonify(response_data)
     except Exception as e:
         print(f"Error fetching messages: {e}")
-        return jsonify({'success': False, 'error': 'Failed to fetch messages'}), 500
+        return jsonify({'success': False, 'error': t('chat.messages_fetch_failed')}), 500
     finally:
         conn.close()
 
@@ -483,11 +484,11 @@ def get_messages(session_id):
 def save_message(session_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     data = request.get_json()
     if not data:
-        return jsonify({'success': False, 'error': 'Request data required'}), 400
+        return jsonify({'success': False, 'error': t('common.request_data_required')}), 400
     
     sender_type = data.get('senderType', 'user')
     content = data.get('content', '')
@@ -497,7 +498,7 @@ def save_message(session_id):
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -508,7 +509,7 @@ def save_message(session_id):
             
             session = cur.fetchone()
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             import json
             cur.execute("""
@@ -553,7 +554,7 @@ def save_message(session_id):
     except Exception as e:
         print(f"Error saving message: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Failed to save message'}), 500
+        return jsonify({'success': False, 'error': t('chat.message_save_failed')}), 500
     finally:
         conn.close()
 
@@ -562,15 +563,15 @@ def save_message(session_id):
 def update_message(session_id, message_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     data = request.get_json()
     if not data:
-        return jsonify({'success': False, 'error': 'Request data required'}), 400
+        return jsonify({'success': False, 'error': t('common.request_data_required')}), 400
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -581,7 +582,7 @@ def update_message(session_id, message_id):
             """, (message_id, session_id, user['user_id']))
             msg = cur.fetchone()
             if not msg:
-                return jsonify({'success': False, 'error': 'Message not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.message_not_found')}), 404
 
             import json
             existing_meta = msg['metadata'] if isinstance(msg['metadata'], dict) else (json.loads(msg['metadata']) if msg['metadata'] else {})
@@ -611,7 +612,7 @@ def update_message(session_id, message_id):
     except Exception as e:
         print(f"Error updating message: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Failed to update message'}), 500
+        return jsonify({'success': False, 'error': t('chat.message_update_failed')}), 500
     finally:
         conn.close()
 
@@ -620,11 +621,11 @@ def update_message(session_id, message_id):
 def update_session(session_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     data = request.get_json()
     if not data:
-        return jsonify({'success': False, 'error': 'Request data required'}), 400
+        return jsonify({'success': False, 'error': t('common.request_data_required')}), 400
     
     title = data.get('title')
     status = data.get('status')
@@ -635,7 +636,7 @@ def update_session(session_id):
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -646,7 +647,7 @@ def update_session(session_id):
             
             session = cur.fetchone()
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             session_db_id = session['id']
             updates = []
@@ -731,7 +732,7 @@ def update_session(session_id):
     except Exception as e:
         print(f"Error updating session: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Failed to update session'}), 500
+        return jsonify({'success': False, 'error': t('chat.session_update_failed')}), 500
     finally:
         conn.close()
 
@@ -740,11 +741,11 @@ def update_session(session_id):
 def delete_session(session_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -760,7 +761,7 @@ def delete_session(session_id):
             
             deleted = cur.fetchone()
             if not deleted:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             conn.commit()
             
@@ -776,12 +777,12 @@ def delete_session(session_id):
             
             return jsonify({
                 'success': True,
-                'message': 'Session deleted successfully'
+                'message': t('chat.session_deleted')
             })
     except Exception as e:
         print(f"Error deleting session: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Failed to delete session'}), 500
+        return jsonify({'success': False, 'error': t('chat.session_delete_failed')}), 500
     finally:
         conn.close()
 
@@ -791,14 +792,14 @@ def upload_session_files(session_id):
     """Upload files (binary data) for a chat session with user/company isolation"""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     if 'old_schedule' not in request.files and 'new_schedule' not in request.files:
-        return jsonify({'success': False, 'error': 'No files provided'}), 400
+        return jsonify({'success': False, 'error': t('chat.no_files')}), 400
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -809,7 +810,7 @@ def upload_session_files(session_id):
             
             session = cur.fetchone()
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found or access denied'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found_or_denied')}), 404
             
             session_db_id = session['id']
             uploaded_files = []
@@ -889,7 +890,7 @@ def upload_session_files(session_id):
             return jsonify({
                 'success': True,
                 'files': uploaded_files,
-                'message': f'{len(uploaded_files)} file(s) uploaded successfully',
+                'message': t('chat.files_uploaded', count=len(uploaded_files)),
                 'title': new_title,
                 'oldFileName': old_file_name,
                 'newFileName': new_file_name
@@ -897,7 +898,7 @@ def upload_session_files(session_id):
     except Exception as e:
         print(f"Error uploading files: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Failed to upload files'}), 500
+        return jsonify({'success': False, 'error': t('chat.upload_failed')}), 500
     finally:
         conn.close()
 
@@ -907,18 +908,18 @@ def save_session_file_metadata(session_id):
     """Store only filenames and update session title — no binary upload required."""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     data = request.get_json() or {}
     old_filename = (data.get('old_filename') or '').strip()
     new_filename = (data.get('new_filename') or '').strip()
 
     if not old_filename and not new_filename:
-        return jsonify({'success': False, 'error': 'At least one filename required'}), 400
+        return jsonify({'success': False, 'error': t('chat.filename_required')}), 400
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -928,7 +929,7 @@ def save_session_file_metadata(session_id):
             """, (session_id, user['user_id']))
             session = cur.fetchone()
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found or access denied'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found_or_denied')}), 404
 
             session_db_id = session['id']
 
@@ -969,7 +970,7 @@ def save_session_file_metadata(session_id):
     except Exception as e:
         print(f"Error saving file metadata: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Failed to save file metadata'}), 500
+        return jsonify({'success': False, 'error': t('chat.file_metadata_save_failed')}), 500
     finally:
         conn.close()
 
@@ -981,14 +982,14 @@ def download_session_file(session_id, file_type):
     
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     if file_type not in ['old_schedule', 'new_schedule']:
-        return jsonify({'success': False, 'error': 'Invalid file type'}), 400
+        return jsonify({'success': False, 'error': t('chat.invalid_file_type')}), 400
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1000,7 +1001,7 @@ def download_session_file(session_id, file_type):
             
             session = cur.fetchone()
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found or access denied'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found_or_denied')}), 404
             
             cur.execute("""
                 SELECT original_filename, file_size, mime_type, file_data
@@ -1010,7 +1011,7 @@ def download_session_file(session_id, file_type):
             
             file_record = cur.fetchone()
             if not file_record or not file_record['file_data']:
-                return jsonify({'success': False, 'error': 'File not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.file_not_found')}), 404
             
             log_audit_event(
                 event_type='file_downloaded',
@@ -1030,7 +1031,7 @@ def download_session_file(session_id, file_type):
             )
     except Exception as e:
         print(f"Error downloading file: {e}")
-        return jsonify({'success': False, 'error': 'Failed to download file'}), 500
+        return jsonify({'success': False, 'error': t('chat.file_download_failed')}), 500
     finally:
         conn.close()
 
@@ -1044,11 +1045,11 @@ def get_annotations(session_id):
     """Get all annotations for a session (company-scoped)"""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1063,7 +1064,7 @@ def get_annotations(session_id):
             session = cur.fetchone()
             
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found or access denied'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found_or_denied')}), 404
             
             cur.execute("""
                 SELECT ta.id, ta.task_key, ta.task_name, ta.annotation_text, ta.tags, ta.is_private,
@@ -1098,7 +1099,7 @@ def get_annotations(session_id):
             return jsonify({'success': True, 'annotations': result})
     except Exception as e:
         print(f"Error getting annotations: {e}")
-        return jsonify({'success': False, 'error': 'Failed to get annotations'}), 500
+        return jsonify({'success': False, 'error': t('chat.annotations_fetch_failed')}), 500
     finally:
         conn.close()
 
@@ -1108,11 +1109,11 @@ def create_annotation(session_id):
     """Create a new annotation for a task (company-scoped)"""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     data = request.get_json()
     if not data:
-        return jsonify({'success': False, 'error': 'No data provided'}), 400
+        return jsonify({'success': False, 'error': t('common.request_data_required')}), 400
     
     task_key = data.get('taskKey', '').strip()
     task_name = data.get('taskName', '').strip()
@@ -1125,11 +1126,11 @@ def create_annotation(session_id):
         task_key = task_name
     
     if not task_key or not annotation_text:
-        return jsonify({'success': False, 'error': 'Task key and annotation text are required'}), 400
+        return jsonify({'success': False, 'error': t('chat.task_key_and_text_required')}), 400
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1144,7 +1145,7 @@ def create_annotation(session_id):
             session = cur.fetchone()
             
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found or access denied'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found_or_denied')}), 404
             
             cur.execute("""
                 INSERT INTO task_annotations 
@@ -1180,7 +1181,7 @@ def create_annotation(session_id):
     except Exception as e:
         print(f"Error creating annotation: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Failed to create annotation'}), 500
+        return jsonify({'success': False, 'error': t('chat.annotation_create_failed')}), 500
     finally:
         conn.close()
 
@@ -1190,15 +1191,15 @@ def update_annotation(annotation_id):
     """Update an existing annotation (owner only, company-scoped)"""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     data = request.get_json()
     if not data:
-        return jsonify({'success': False, 'error': 'No data provided'}), 400
+        return jsonify({'success': False, 'error': t('common.request_data_required')}), 400
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1207,7 +1208,7 @@ def update_annotation(annotation_id):
             user_company_id = user_data['company_id'] if user_data else None
             
             if user_company_id is None:
-                return jsonify({'success': False, 'error': 'User must belong to a company'}), 403
+                return jsonify({'success': False, 'error': t('user.must_belong_to_company')}), 403
             
             cur.execute("""
                 SELECT id, user_id, company_id, task_key, task_name FROM task_annotations WHERE id = %s
@@ -1215,20 +1216,20 @@ def update_annotation(annotation_id):
             annotation = cur.fetchone()
             
             if not annotation:
-                return jsonify({'success': False, 'error': 'Annotation not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.annotation_not_found')}), 404
             
             if annotation['company_id'] is None or annotation['company_id'] != user_company_id:
-                return jsonify({'success': False, 'error': 'Access denied'}), 403
+                return jsonify({'success': False, 'error': t('common.access_denied')}), 403
             
             if annotation['user_id'] != user['user_id']:
-                return jsonify({'success': False, 'error': 'You can only edit your own annotations'}), 403
+                return jsonify({'success': False, 'error': t('chat.only_edit_own_annotations')}), 403
             
             annotation_text = data.get('text', '').strip()
             tags = data.get('tags', [])
             is_private = data.get('isPrivate', False)
             
             if not annotation_text:
-                return jsonify({'success': False, 'error': 'Annotation text is required'}), 400
+                return jsonify({'success': False, 'error': t('chat.annotation_text_required')}), 400
             
             cur.execute("""
                 UPDATE task_annotations 
@@ -1255,7 +1256,7 @@ def update_annotation(annotation_id):
     except Exception as e:
         print(f"Error updating annotation: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Failed to update annotation'}), 500
+        return jsonify({'success': False, 'error': t('chat.annotation_update_failed')}), 500
     finally:
         conn.close()
 
@@ -1265,11 +1266,11 @@ def delete_annotation(annotation_id):
     """Delete an annotation (owner only, company-scoped)"""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1278,7 +1279,7 @@ def delete_annotation(annotation_id):
             user_company_id = user_data['company_id'] if user_data else None
             
             if user_company_id is None:
-                return jsonify({'success': False, 'error': 'User must belong to a company'}), 403
+                return jsonify({'success': False, 'error': t('user.must_belong_to_company')}), 403
             
             cur.execute("""
                 SELECT id, user_id, company_id, task_key, task_name FROM task_annotations WHERE id = %s
@@ -1286,13 +1287,13 @@ def delete_annotation(annotation_id):
             annotation = cur.fetchone()
             
             if not annotation:
-                return jsonify({'success': False, 'error': 'Annotation not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.annotation_not_found')}), 404
             
             if annotation['company_id'] is None or annotation['company_id'] != user_company_id:
-                return jsonify({'success': False, 'error': 'Access denied'}), 403
+                return jsonify({'success': False, 'error': t('common.access_denied')}), 403
             
             if annotation['user_id'] != user['user_id']:
-                return jsonify({'success': False, 'error': 'You can only delete your own annotations'}), 403
+                return jsonify({'success': False, 'error': t('chat.only_delete_own_annotations')}), 403
             
             cur.execute("DELETE FROM task_annotations WHERE id = %s", (annotation_id,))
             conn.commit()
@@ -1305,11 +1306,11 @@ def delete_annotation(annotation_id):
                 context={'task_name': annotation['task_name'], 'annotation_id': annotation_id}
             )
             
-            return jsonify({'success': True, 'message': 'Annotation deleted successfully'})
+            return jsonify({'success': True, 'message': t('chat.annotation_deleted')})
     except Exception as e:
         print(f"Error deleting annotation: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Failed to delete annotation'}), 500
+        return jsonify({'success': False, 'error': t('chat.annotation_delete_failed')}), 500
     finally:
         conn.close()
 
@@ -1322,13 +1323,13 @@ def download_message_pdf(session_id, message_id):
     
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     language = request.args.get('lang', 'da')
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1348,14 +1349,14 @@ def download_message_pdf(session_id, message_id):
             
             session = cur.fetchone()
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             is_owner = session['user_id'] == user['user_id']
             is_company_admin = user_role in ['company_owner', 'admin'] and session['company_id'] == user_company_id
             is_super_admin = user_role == 'super_admin'
             
             if not (is_owner or is_company_admin or is_super_admin):
-                return jsonify({'success': False, 'error': 'Access denied'}), 403
+                return jsonify({'success': False, 'error': t('common.access_denied')}), 403
             
             cur.execute("""
                 SELECT id, sender_type, content, content_type, is_html, metadata, created_at
@@ -1365,7 +1366,7 @@ def download_message_pdf(session_id, message_id):
             
             message = cur.fetchone()
             if not message:
-                return jsonify({'success': False, 'error': 'Message not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.message_not_found')}), 404
             
             query_text = None
             if message['sender_type'] == 'bot':
@@ -1413,7 +1414,7 @@ def download_message_pdf(session_id, message_id):
             pdf_buffer = generate_message_pdf(message_data, session_info, user_info, language, query_text)
             
             if not pdf_buffer:
-                return jsonify({'success': False, 'error': 'Failed to generate PDF content'}), 500
+                return jsonify({'success': False, 'error': t('chat.pdf_content_failed')}), 500
             
             date_str = datetime.now().strftime('%Y-%m-%d')
             if query_text:
@@ -1444,7 +1445,7 @@ def download_message_pdf(session_id, message_id):
         print(f"❌ Error generating message PDF: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'error': f'Failed to generate PDF: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': t('chat.pdf_failed_detail', detail=str(e))}), 500
     finally:
         conn.close()
 
@@ -1456,13 +1457,13 @@ def download_session_pdf(session_id):
     
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     language = request.args.get('lang', 'da')
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1482,14 +1483,14 @@ def download_session_pdf(session_id):
             
             session = cur.fetchone()
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             is_owner = session['user_id'] == user['user_id']
             is_company_admin = user_role in ['company_owner', 'admin'] and session['company_id'] == user_company_id
             is_super_admin = user_role == 'super_admin'
             
             if not (is_owner or is_company_admin or is_super_admin):
-                return jsonify({'success': False, 'error': 'Access denied'}), 403
+                return jsonify({'success': False, 'error': t('common.access_denied')}), 403
             
             cur.execute("""
                 SELECT id, sender_type, content, content_type, is_html, metadata, created_at
@@ -1581,7 +1582,7 @@ def download_session_pdf(session_id):
         print(f"Error generating session PDF: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'error': 'Failed to generate PDF'}), 500
+        return jsonify({'success': False, 'error': t('chat.pdf_failed')}), 500
     finally:
         conn.close()
 
@@ -1592,7 +1593,7 @@ AGENT_BASE_URL = os.getenv('AGENT_BASE_URL', 'https://nova-ai-backend-dga5ffaudz
 def proxy_query():
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     try:
         query = request.form.get('query', '')
@@ -1641,15 +1642,15 @@ def proxy_query():
         print(f"✅ Azure agent responded: {resp.status_code}")
         
         if resp.status_code != 200:
-            return jsonify({'success': False, 'error': f'Agent returned {resp.status_code}'}), resp.status_code
+            return jsonify({'success': False, 'error': t('chat.agent_status', status=resp.status_code)}), resp.status_code
         
         return jsonify(resp.json())
     except http_requests.exceptions.Timeout:
         print("⏰ Azure agent query timed out after 5 minutes")
-        return jsonify({'success': False, 'error': 'Query timed out after 5 minutes. The server may be processing a large document.'}), 504
+        return jsonify({'success': False, 'error': t('chat.query_timeout_large')}), 504
     except http_requests.exceptions.ConnectionError as e:
         print(f"🔌 Azure agent connection error: {e}")
-        return jsonify({'success': False, 'error': 'Could not connect to the AI agent. Please try again.'}), 502
+        return jsonify({'success': False, 'error': t('common.agent_unreachable')}), 502
     except Exception as e:
         print(f"❌ Proxy query error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1714,7 +1715,7 @@ def _cache_session_source_files(session_id, user_id, company_id, request_files):
 def proxy_upload():
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     try:
         files = {}
@@ -1745,11 +1746,11 @@ def proxy_upload():
         print(f"📥 Azure response: {resp_data}")
         
         if resp.status_code != 200:
-            return jsonify({'success': False, 'error': f'Agent returned {resp.status_code}'}), resp.status_code
+            return jsonify({'success': False, 'error': t('chat.agent_status', status=resp.status_code)}), resp.status_code
         
         return jsonify(resp_data)
     except http_requests.exceptions.Timeout:
-        return jsonify({'success': False, 'error': 'Upload timed out after 5 minutes'}), 504
+        return jsonify({'success': False, 'error': t('chat.upload_timeout')}), 504
     except Exception as e:
         print(f"❌ Proxy upload error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1759,7 +1760,7 @@ def proxy_upload():
 def proxy_upload_progress(upload_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
     try:
         resp = http_requests.get(
@@ -1769,7 +1770,7 @@ def proxy_upload_progress(upload_id):
         )
         
         if resp.status_code != 200:
-            return jsonify({'success': False, 'error': f'Agent returned {resp.status_code}'}), resp.status_code
+            return jsonify({'success': False, 'error': t('chat.agent_status', status=resp.status_code)}), resp.status_code
         
         return jsonify(resp.json())
     except Exception as e:
@@ -1781,7 +1782,7 @@ def proxy_upload_progress(upload_id):
 def proxy_v2_upload():
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     try:
         files = {}
@@ -1813,7 +1814,7 @@ def proxy_v2_upload():
         if resp.status_code != 200:
             if resp.status_code == 404:
                 return jsonify({'success': False, 'error': 'NUSF_V2_UNAVAILABLE'}), 503
-            return jsonify({'success': False, 'error': f'Agent returned {resp.status_code}'}), 502
+            return jsonify({'success': False, 'error': t('chat.agent_status', status=resp.status_code)}), 502
 
         chat_session_id = form_data.get('session_id')
         if chat_session_id:
@@ -1835,7 +1836,7 @@ def proxy_v2_upload():
 
         return jsonify(resp_data)
     except http_requests.exceptions.Timeout:
-        return jsonify({'success': False, 'error': 'Upload timed out after 5 minutes'}), 504
+        return jsonify({'success': False, 'error': t('chat.upload_timeout')}), 504
     except Exception as e:
         print(f"❌ [v2/NUSF] Proxy upload error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1845,7 +1846,7 @@ def proxy_v2_upload():
 def proxy_v2_upload_progress(upload_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     try:
         resp = http_requests.get(
@@ -1855,7 +1856,7 @@ def proxy_v2_upload_progress(upload_id):
         )
 
         if resp.status_code != 200:
-            return jsonify({'success': False, 'error': f'Agent returned {resp.status_code}'}), resp.status_code
+            return jsonify({'success': False, 'error': t('chat.agent_status', status=resp.status_code)}), resp.status_code
 
         return jsonify(resp.json())
     except Exception as e:
@@ -1867,7 +1868,7 @@ def proxy_v2_upload_progress(upload_id):
 def proxy_v2_query():
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     try:
         query = request.form.get('query', '')
@@ -1897,15 +1898,15 @@ def proxy_v2_query():
         print(f"✅ [v2/NUSF] Azure agent v2/query responded: {resp.status_code}")
 
         if resp.status_code != 200:
-            return jsonify({'success': False, 'error': f'Agent returned {resp.status_code}'}), 502
+            return jsonify({'success': False, 'error': t('chat.agent_status', status=resp.status_code)}), 502
 
         return jsonify(resp.json())
     except http_requests.exceptions.Timeout:
         print("⏰ [v2/NUSF] Azure agent v2/query timed out")
-        return jsonify({'success': False, 'error': 'Query timed out after 5 minutes.'}), 504
+        return jsonify({'success': False, 'error': t('chat.query_timeout')}), 504
     except http_requests.exceptions.ConnectionError as e:
         print(f"🔌 [v2/NUSF] Azure agent v2/query connection error: {e}")
-        return jsonify({'success': False, 'error': 'Could not connect to the AI agent. Please try again.'}), 502
+        return jsonify({'success': False, 'error': t('common.agent_unreachable')}), 502
     except Exception as e:
         print(f"❌ [v2/NUSF] Proxy v2 query error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

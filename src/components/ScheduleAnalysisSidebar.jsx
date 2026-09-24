@@ -20,6 +20,7 @@ const ScheduleAnalysisSidebar = ({
   isCreating,
   isOpen,
   onToggle,
+  embedded = false,
 }) => {
   const { t } = useTranslation();
   const [deletingId, setDeletingId] = useState(null);
@@ -96,7 +97,7 @@ const ScheduleAnalysisSidebar = ({
   if (!isOpen) return null;
 
   return (
-    <div className="w-72 h-full flex flex-col bg-white border-r border-slate-200 flex-shrink-0">
+    <div className={embedded ? 'w-full flex-1 min-h-0 flex flex-col bg-white' : 'w-72 h-full flex flex-col bg-white border-r border-slate-200 flex-shrink-0'}>
       <div className="p-4 border-b border-slate-200">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -107,6 +108,7 @@ const ScheduleAnalysisSidebar = ({
             </div>
             <h2 className="text-sm font-bold text-slate-800">{t('scheduleAnalysis.sidebar.title')}</h2>
           </div>
+          {!embedded && (
           <button
             onClick={onToggle}
             className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
@@ -115,6 +117,7 @@ const ScheduleAnalysisSidebar = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
             </svg>
           </button>
+          )}
         </div>
 
         <button

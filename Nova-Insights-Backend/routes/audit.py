@@ -4,6 +4,7 @@ API endpoints for viewing and exporting audit logs
 """
 from flask import Blueprint, request, jsonify, Response
 from utils.database import get_db_connection
+from utils.i18n import t
 from middleware.auth_middleware import require_auth
 from utils.redis_client import cache_get, cache_set, cache_delete
 from psycopg2.extras import RealDictCursor
@@ -58,11 +59,11 @@ def company_owner_or_super_admin_required(f):
     def decorated_function(*args, **kwargs):
         user = get_current_user()
         if not user:
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+            return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
         
         conn = get_db_connection()
         if not conn:
-            return jsonify({'success': False, 'error': 'Database error'}), 500
+            return jsonify({'success': False, 'error': t('common.db_error')}), 500
         
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -73,10 +74,10 @@ def company_owner_or_super_admin_required(f):
                 user_data = cur.fetchone()
                 
                 if not user_data:
-                    return jsonify({'success': False, 'error': 'User not found'}), 401
+                    return jsonify({'success': False, 'error': t('user.not_found')}), 401
                 
                 if user_data['role'] not in ['company_owner', 'super_admin']:
-                    return jsonify({'success': False, 'error': 'Access denied'}), 403
+                    return jsonify({'success': False, 'error': t('common.access_denied')}), 403
                 
                 request.current_user = user_data
                 
@@ -96,11 +97,11 @@ def super_admin_required(f):
     def decorated_function(*args, **kwargs):
         user = get_current_user()
         if not user:
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+            return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
         
         conn = get_db_connection()
         if not conn:
-            return jsonify({'success': False, 'error': 'Database error'}), 500
+            return jsonify({'success': False, 'error': t('common.db_error')}), 500
         
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -111,10 +112,10 @@ def super_admin_required(f):
                 user_data = cur.fetchone()
                 
                 if not user_data:
-                    return jsonify({'success': False, 'error': 'User not found'}), 401
+                    return jsonify({'success': False, 'error': t('user.not_found')}), 401
                 
                 if user_data['role'] != 'super_admin':
-                    return jsonify({'success': False, 'error': 'Super admin access required'}), 403
+                    return jsonify({'success': False, 'error': t('auth.super_admin_required')}), 403
                 
                 request.current_user = user_data
                 
@@ -134,7 +135,7 @@ def get_company_audit_logs():
     company_id = user['company_id']
     
     if not company_id:
-        return jsonify({'success': False, 'error': 'No company associated'}), 400
+        return jsonify({'success': False, 'error': t('company.none_associated')}), 400
     
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 20, type=int)
@@ -148,7 +149,7 @@ def get_company_audit_logs():
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -232,7 +233,7 @@ def get_company_audit_logs():
             
     except Exception as e:
         print(f"Error fetching audit logs: {e}")
-        return jsonify({'success': False, 'error': 'Failed to fetch logs'}), 500
+        return jsonify({'success': False, 'error': t('audit.logs_fetch_failed')}), 500
     finally:
         conn.close()
 
@@ -245,7 +246,7 @@ def export_company_audit_logs():
     company_id = user['company_id']
     
     if not company_id:
-        return jsonify({'success': False, 'error': 'No company associated'}), 400
+        return jsonify({'success': False, 'error': t('company.none_associated')}), 400
     
     event_type = request.args.get('eventType', '')
     start_date = request.args.get('startDate', '')
@@ -253,7 +254,7 @@ def export_company_audit_logs():
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -336,7 +337,7 @@ def export_company_audit_logs():
             
     except Exception as e:
         print(f"Error exporting audit logs: {e}")
-        return jsonify({'success': False, 'error': 'Failed to export logs'}), 500
+        return jsonify({'success': False, 'error': t('audit.logs_export_failed')}), 500
     finally:
         conn.close()
 
@@ -359,7 +360,7 @@ def get_all_audit_logs():
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -462,7 +463,7 @@ def get_all_audit_logs():
             
     except Exception as e:
         print(f"Error fetching audit logs: {e}")
-        return jsonify({'success': False, 'error': 'Failed to fetch logs'}), 500
+        return jsonify({'success': False, 'error': t('audit.logs_fetch_failed')}), 500
     finally:
         conn.close()
 
@@ -480,7 +481,7 @@ def get_company_chat_histories():
     company_id = user['company_id']
     
     if not company_id:
-        return jsonify({'success': False, 'error': 'No company associated'}), 400
+        return jsonify({'success': False, 'error': t('company.none_associated')}), 400
     
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 20, type=int)
@@ -503,7 +504,7 @@ def get_company_chat_histories():
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -588,7 +589,7 @@ def get_company_chat_histories():
             
     except Exception as e:
         print(f"Error fetching chat histories: {e}")
-        return jsonify({'success': False, 'error': 'Failed to fetch chat histories'}), 500
+        return jsonify({'success': False, 'error': t('audit.chat_histories_fetch_failed')}), 500
     finally:
         conn.close()
 
@@ -612,7 +613,7 @@ def get_company_chat_messages(session_id):
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -625,7 +626,7 @@ def get_company_chat_messages(session_id):
             session = cur.fetchone()
             
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             cur.execute("""
                 SELECT id, sender_type, content, content_type, is_html, metadata, created_at
@@ -677,7 +678,7 @@ def get_company_chat_messages(session_id):
             
     except Exception as e:
         print(f"Error fetching chat messages: {e}")
-        return jsonify({'success': False, 'error': 'Failed to fetch messages'}), 500
+        return jsonify({'success': False, 'error': t('chat.messages_fetch_failed')}), 500
     finally:
         conn.close()
 
@@ -694,7 +695,7 @@ def export_all_audit_logs():
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -785,7 +786,7 @@ def export_all_audit_logs():
             
     except Exception as e:
         print(f"Error exporting audit logs: {e}")
-        return jsonify({'success': False, 'error': 'Failed to export logs'}), 500
+        return jsonify({'success': False, 'error': t('audit.logs_export_failed')}), 500
     finally:
         conn.close()
 
@@ -805,7 +806,7 @@ def get_all_chat_histories():
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -896,7 +897,7 @@ def get_all_chat_histories():
             
     except Exception as e:
         print(f"Error fetching chat histories: {e}")
-        return jsonify({'success': False, 'error': 'Failed to fetch chat histories'}), 500
+        return jsonify({'success': False, 'error': t('audit.chat_histories_fetch_failed')}), 500
     finally:
         conn.close()
 
@@ -907,7 +908,7 @@ def get_super_admin_chat_messages(session_id):
     """Get messages for a specific chat session (super admin only)"""
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -921,7 +922,7 @@ def get_super_admin_chat_messages(session_id):
             session = cur.fetchone()
             
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             cur.execute("""
                 SELECT id, sender_type, content, content_type, is_html, metadata, created_at
@@ -970,7 +971,7 @@ def get_super_admin_chat_messages(session_id):
             
     except Exception as e:
         print(f"Error fetching chat messages: {e}")
-        return jsonify({'success': False, 'error': 'Failed to fetch messages'}), 500
+        return jsonify({'success': False, 'error': t('chat.messages_fetch_failed')}), 500
     finally:
         conn.close()
 
@@ -996,14 +997,14 @@ def export_company_chat_histories():
     company_id = user['company_id']
     
     if not company_id:
-        return jsonify({'success': False, 'error': 'No company associated'}), 400
+        return jsonify({'success': False, 'error': t('company.none_associated')}), 400
     
     user_filter = request.args.get('userId', '', type=int) if request.args.get('userId') else None
     search = request.args.get('search', '')
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1086,7 +1087,7 @@ def export_company_chat_histories():
             
     except Exception as e:
         print(f"Error exporting chat histories: {e}")
-        return jsonify({'success': False, 'error': 'Failed to export chat histories'}), 500
+        return jsonify({'success': False, 'error': t('audit.chat_histories_export_failed')}), 500
     finally:
         conn.close()
 
@@ -1100,7 +1101,7 @@ def export_company_chat_session(session_id):
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1113,7 +1114,7 @@ def export_company_chat_session(session_id):
             session = cur.fetchone()
             
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             cur.execute("""
                 SELECT id, sender_type, content, content_type, is_html, metadata, created_at
@@ -1163,7 +1164,7 @@ def export_company_chat_session(session_id):
             
     except Exception as e:
         print(f"Error exporting chat session: {e}")
-        return jsonify({'success': False, 'error': 'Failed to export session'}), 500
+        return jsonify({'success': False, 'error': t('audit.session_export_failed')}), 500
     finally:
         conn.close()
 
@@ -1178,7 +1179,7 @@ def export_all_chat_histories():
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1267,7 +1268,7 @@ def export_all_chat_histories():
             
     except Exception as e:
         print(f"Error exporting chat histories: {e}")
-        return jsonify({'success': False, 'error': 'Failed to export chat histories'}), 500
+        return jsonify({'success': False, 'error': t('audit.chat_histories_export_failed')}), 500
     finally:
         conn.close()
 
@@ -1278,7 +1279,7 @@ def export_super_admin_chat_session(session_id):
     """Export a single chat session with messages (super admin only)"""
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1292,7 +1293,7 @@ def export_super_admin_chat_session(session_id):
             session = cur.fetchone()
             
             if not session:
-                return jsonify({'success': False, 'error': 'Session not found'}), 404
+                return jsonify({'success': False, 'error': t('chat.session_not_found')}), 404
             
             cur.execute("""
                 SELECT id, sender_type, content, content_type, is_html, metadata, created_at
@@ -1343,6 +1344,6 @@ def export_super_admin_chat_session(session_id):
             
     except Exception as e:
         print(f"Error exporting chat session: {e}")
-        return jsonify({'success': False, 'error': 'Failed to export session'}), 500
+        return jsonify({'success': False, 'error': t('audit.session_export_failed')}), 500
     finally:
         conn.close()

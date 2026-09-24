@@ -13,6 +13,7 @@ import DataTable from "./DataTable";
 import ReactMarkdown from "react-markdown";
 import FileComparisonModal from "./FileComparisonModal";
 import ChatHistorySidebar from "./ChatHistorySidebar";
+import { MobileHistoryBar, MobileHistorySheet } from "./MobileHistory";
 import { postWithAuth, getWithAuth, putWithAuth } from "../utils/authApi";
 import { parseSummaryFromResponse, extractResponseWithoutSummary } from "./SummaryPanel";
 import { generateComparisonPDF } from "../utils/pdfGenerator";
@@ -1822,6 +1823,7 @@ const ChatWidget = ({
   const [processingProgress, setProcessingProgress] = useState(0);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isHistorySheetOpen, setIsHistorySheetOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef(null);
@@ -2729,7 +2731,25 @@ const ChatWidget = ({
     }
   };
 
+  // Guards against spamming "New": ignore clicks while a create is in flight,
+  // and don't create another session while the current one is still untouched.
+  const isCreatingChatRef = useRef(false);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
   const handleNewChat = async () => {
+    setIsHistorySheetOpen(false);
+    if (isCreatingChatRef.current) return;
+    if (sessionId && messages.length <= 1 && !filesUploaded) return;
+    isCreatingChatRef.current = true;
+    setIsCreatingChat(true);
+    try {
+      await createNewChat();
+    } finally {
+      isCreatingChatRef.current = false;
+      setIsCreatingChat(false);
+    }
+  };
+
+  const createNewChat = async () => {
     // Generate new session ID first
     const newSessionId = `session_${[...Array(20)].map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`;
     console.log('🆕 Creating new chat session:', newSessionId);
@@ -2819,11 +2839,8 @@ const ChatWidget = ({
   };
 
   const handleSelectSession = async (session) => {
-    // Keep sidebar open for smooth navigation between chats
-    // Only close on mobile for better UX
-    if (isMobile) {
-      setIsSidebarOpen(false);
-    }
+    // Keep the desktop sidebar open for smooth navigation; close the mobile sheet
+    setIsHistorySheetOpen(false);
     
     // Save the current session's messages before leaving (captures any new messages sent)
     if (sessionId && messages.length > 1) {
@@ -3451,8 +3468,40 @@ const ChatWidget = ({
               />
             )}
 
+            {/* Mobile: history lives in a bottom sheet instead of a sidebar */}
+            {user && isMobile && (
+              <MobileHistorySheet open={isHistorySheetOpen} onClose={() => setIsHistorySheetOpen(false)}>
+                <ChatHistorySidebar
+                  isOpen
+                  embedded
+                  onNewChat={handleNewChat}
+                  onSelectSession={handleSelectSession}
+                  activeSessionId={sessionId}
+                  user={user}
+                  isReadOnly={user?.role === 'read_only_user'}
+                  sidebarWidth={sidebarWidth}
+                  onWidthChange={setSidebarWidth}
+                  isResizing={isResizing}
+                  onResizeStart={handleResizeStart}
+                  refreshTrigger={sidebarRefreshTrigger}
+                  onSessionsLoaded={handleSessionsLoaded}
+                  updatedSessionInfo={updatedSessionInfo}
+                  forceUpdateKey={sidebarForceUpdateKey}
+                />
+              </MobileHistorySheet>
+            )}
+
             {/* Messages Area */}
             <div className={`flex-1 flex flex-col overflow-hidden ${isFullPage ? 'h-full min-h-0' : ''}`}>
+              {user && isMobile && (
+                <MobileHistoryBar
+                  title={t('chatHistory.title')}
+                  newLabel={t('chatHistory.newChat')}
+                  onOpenHistory={() => setIsHistorySheetOpen(true)}
+                  onNew={handleNewChat}
+                  newDisabled={user?.role === 'read_only_user' || isCreatingChat}
+                />
+              )}
               {/* Download All PDF Button - Fixed below header */}
               {hasTablesInMessages && !isLoadingSession && (
                 <div className="flex justify-end px-6 py-2 border-b border-gray-100 bg-white/80">

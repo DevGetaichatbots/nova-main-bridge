@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, send_file
 from utils.database import get_db_connection
+from utils.i18n import t
 from utils.token_manager import decode_token
 from utils.audit_logger import log_audit_event
 from utils.redis_client import cache_get, cache_set, cache_delete
@@ -13,7 +14,7 @@ from datetime import datetime
 import secrets
 import json
 import uuid
-import requests as http_requests
+from utils import agent_http as http_requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -254,11 +255,11 @@ def list_review_queue(comparison_id):
     company-wide reporting, not as a second access-control gate."""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
@@ -267,7 +268,7 @@ def list_review_queue(comparison_id):
             """, (comparison_id, user['user_id']))
             row = cur.fetchone()
             if not row:
-                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_found')}), 404
             items = row['review_queue'] or []
 
             cur.execute("""
@@ -302,19 +303,19 @@ def resolve_review_item(comparison_id, item_id):
     database layer: there is no UPDATE statement in this handler)."""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     if user.get('role') == 'read_only_user':
-        return jsonify({'success': False, 'error': 'Read-only users cannot resolve review items'}), 403
+        return jsonify({'success': False, 'error': t('schedule.read_only.resolve_review_items')}), 403
 
     data = request.get_json() or {}
     chosen_option_id = data.get('chosen_option_id')
     note = data.get('note', '')
     if not chosen_option_id:
-        return jsonify({'success': False, 'error': 'chosen_option_id is required'}), 400
+        return jsonify({'success': False, 'error': t('schedule.chosen_option_required')}), 400
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
@@ -323,10 +324,10 @@ def resolve_review_item(comparison_id, item_id):
             """, (comparison_id, user['user_id']))
             row = cur.fetchone()
             if not row:
-                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_found')}), 404
             item = next((it for it in (row['review_queue'] or []) if it.get('item_id') == item_id), None)
             if item is None:
-                return jsonify({'success': False, 'error': 'Review item not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.review_item_not_found')}), 404
 
             valid_option_ids = {'no_match'} | {
                 o.get('option_id') for o in item.get('candidate_options', [])
@@ -334,7 +335,7 @@ def resolve_review_item(comparison_id, item_id):
             if chosen_option_id not in valid_option_ids:
                 return jsonify({
                     'success': False,
-                    'error': f'{chosen_option_id!r} is not a valid option for this item',
+                    'error': t('schedule.invalid_option', option=repr(chosen_option_id)),
                 }), 400
 
             cur.execute("""
@@ -394,16 +395,16 @@ def reopen_review_item(comparison_id, item_id):
     `ReviewQueueStore.reopen`'s contract in `rag-agent/backend`."""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     if user.get('role') == 'read_only_user':
-        return jsonify({'success': False, 'error': 'Read-only users cannot reopen review items'}), 403
+        return jsonify({'success': False, 'error': t('schedule.read_only.reopen_review_items')}), 403
 
     data = request.get_json() or {}
     note = data.get('note', '')
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
@@ -411,7 +412,7 @@ def reopen_review_item(comparison_id, item_id):
                 WHERE comparison_id = %s AND user_id = %s
             """, (comparison_id, user['user_id']))
             if not cur.fetchone():
-                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_found')}), 404
 
             cur.execute("""
                 SELECT action FROM review_item_resolutions
@@ -422,7 +423,7 @@ def reopen_review_item(comparison_id, item_id):
             if not latest or latest['action'] != 'resolved':
                 return jsonify({
                     'success': False,
-                    'error': 'Item is not currently resolved — nothing to reopen',
+                    'error': t('schedule.item_not_resolved'),
                 }), 400
 
             cur.execute("""
@@ -484,7 +485,7 @@ def _invalidate_single_analysis_cache(analysis_id):
 def list_analyses():
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     cache_key = f"schedule_analyses:user:{user['user_id']}"
     cached = cache_get(cache_key)
@@ -496,7 +497,7 @@ def list_analyses():
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -531,10 +532,10 @@ def list_analyses():
 def create_analysis():
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     if user.get('role') == 'read_only_user':
-        return jsonify({'success': False, 'error': 'Read-only users cannot create analyses'}), 403
+        return jsonify({'success': False, 'error': t('schedule.read_only.create_analyses')}), 403
 
     data = request.get_json() or {}
     analysis_id = data.get('analysis_id', f"sa_{secrets.token_hex(8)}")
@@ -542,7 +543,7 @@ def create_analysis():
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -578,7 +579,7 @@ def create_analysis():
 def get_analysis(analysis_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     cache_key = f"schedule_analysis:{analysis_id}"
     cached = cache_get(cache_key)
@@ -592,7 +593,7 @@ def get_analysis(analysis_id):
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -606,7 +607,7 @@ def get_analysis(analysis_id):
             analysis = cur.fetchone()
 
             if not analysis:
-                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.analysis_not_found')}), 404
 
             if analysis.get('created_at'):
                 analysis['created_at'] = analysis['created_at'].isoformat()
@@ -632,7 +633,7 @@ def get_public_shared_analysis(analysis_id):
     language = request.args.get('language')
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -646,10 +647,10 @@ def get_public_shared_analysis(analysis_id):
             analysis = cur.fetchone()
 
             if not analysis:
-                return jsonify({'success': False, 'error': 'Shared dashboard not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.shared_dashboard_not_found')}), 404
 
             if analysis.get('status') != 'completed' or not analysis.get('predictive_insights'):
-                return jsonify({'success': False, 'error': 'Dashboard is not ready to share'}), 404
+                return jsonify({'success': False, 'error': t('schedule.dashboard_not_ready_to_share')}), 404
 
             _isoformat_dates(analysis, 'created_at', 'updated_at')
             analysis = _localize_analysis_payload(analysis, language)
@@ -667,11 +668,11 @@ def get_public_shared_analysis(analysis_id):
 def download_analysis_pdf(analysis_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -685,10 +686,10 @@ def download_analysis_pdf(analysis_id):
             analysis = cur.fetchone()
 
             if not analysis:
-                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.analysis_not_found')}), 404
 
             if analysis.get('status') != 'completed' or not analysis.get('predictive_insights'):
-                return jsonify({'success': False, 'error': 'Analysis not yet completed'}), 400
+                return jsonify({'success': False, 'error': t('schedule.analysis_not_completed')}), 400
 
             if analysis.get('created_at'):
                 analysis['created_at'] = analysis['created_at'].isoformat()
@@ -722,11 +723,11 @@ def get_analysis_source_document(analysis_id):
     """Authenticated, tenant-scoped source document endpoint (TL-9.1, Brief §24)."""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -737,7 +738,7 @@ def get_analysis_source_document(analysis_id):
             """, (analysis_id, user['user_id']))
             analysis = cur.fetchone()
             if not analysis:
-                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.analysis_not_found')}), 404
 
             filename = analysis.get('filename') or 'schedule.pdf'
             file_data = analysis.get('file_data')
@@ -748,12 +749,12 @@ def get_analysis_source_document(analysis_id):
                 try:
                     page_num = int(page_arg)
                 except ValueError:
-                    return jsonify({'success': False, 'error': 'page must be an integer'}), 400
+                    return jsonify({'success': False, 'error': t('schedule.page_must_be_integer')}), 400
 
                 # Non-paginated documents degrade honestly (never fabricate page numbers)
                 fn_lower = filename.lower().strip()
                 if any(fn_lower.endswith(ext) for ext in ('.csv', '.xlsx', '.xls', '.mpp', '.xml')):
-                    return jsonify({'success': False, 'error': 'Source document is not a paginated PDF'}), 400
+                    return jsonify({'success': False, 'error': t('schedule.source_not_paginated_pdf')}), 400
 
                 if file_data and bytes(file_data).startswith(b"%PDF"):
                     files = {'pdf_file': (filename, bytes(file_data), 'application/pdf')}
@@ -773,10 +774,10 @@ def get_analysis_source_document(analysis_id):
                     else:
                         return jsonify({'success': False, 'error': resp.text}), resp.status_code
                 else:
-                    return jsonify({'success': False, 'error': 'Source document not available for rendering'}), 404
+                    return jsonify({'success': False, 'error': t('schedule.source_not_available')}), 404
 
             if not file_data:
-                return jsonify({'success': False, 'error': 'Source file not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.source_file_not_found')}), 404
 
             import io
             mimetype = _schedule_mime_type(filename)
@@ -798,11 +799,11 @@ def get_analysis_audit_trail(analysis_id):
     """Authenticated, tenant-scoped audit reconstruction endpoint (TL-9.2, Brief §40)."""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -814,7 +815,7 @@ def get_analysis_audit_trail(analysis_id):
             """, (analysis_id, user['user_id']))
             analysis = cur.fetchone()
             if not analysis:
-                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.analysis_not_found')}), 404
 
             # Attempt to retrieve from agent's cryptographic audit store
             try:
@@ -857,11 +858,11 @@ def get_analysis_audit_trail(analysis_id):
 def delete_analysis(analysis_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor() as cur:
@@ -874,11 +875,11 @@ def delete_analysis(analysis_id):
             conn.commit()
 
             if not deleted:
-                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.analysis_not_found')}), 404
 
             _invalidate_analyses_cache(user['user_id'])
             _invalidate_single_analysis_cache(analysis_id)
-            return jsonify({'success': True, 'message': 'Analysis deleted'})
+            return jsonify({'success': True, 'message': t('schedule.analysis_deleted')})
     except Exception as e:
         conn.rollback()
         print(f"Error deleting analysis: {e}")
@@ -891,16 +892,16 @@ def delete_analysis(analysis_id):
 def rename_analysis(analysis_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     data = request.get_json() or {}
     title = data.get('title')
     if not title:
-        return jsonify({'success': False, 'error': 'Title is required'}), 400
+        return jsonify({'success': False, 'error': t('schedule.title_required')}), 400
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -914,7 +915,7 @@ def rename_analysis(analysis_id):
             conn.commit()
 
             if not analysis:
-                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.analysis_not_found')}), 404
 
             _invalidate_analyses_cache(user['user_id'])
             _invalidate_single_analysis_cache(analysis_id)
@@ -931,7 +932,7 @@ def rename_analysis(analysis_id):
 def get_analysis_progress(analysis_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     try:
         resp = http_requests.get(
@@ -941,27 +942,27 @@ def get_analysis_progress(analysis_id):
         )
         if resp.status_code == 200:
             return jsonify(resp.json())
-        return jsonify({'stage': 'unknown', 'message': 'Waiting for progress...', 'step': 0, 'total_steps': 6}), 200
+        return jsonify({'stage': 'unknown', 'message': t('schedule.waiting_progress'), 'step': 0, 'total_steps': 6}), 200
     except Exception as e:
         print(f"Progress poll error: {e}")
-        return jsonify({'stage': 'unknown', 'message': 'Waiting for progress...', 'step': 0, 'total_steps': 6}), 200
+        return jsonify({'stage': 'unknown', 'message': t('schedule.waiting_progress'), 'step': 0, 'total_steps': 6}), 200
 
 
 @schedule_bp.route('/analyses/<analysis_id>/upload', methods=['POST'])
 def upload_and_analyze(analysis_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     if user.get('role') == 'read_only_user':
-        return jsonify({'success': False, 'error': 'Read-only users cannot upload files'}), 403
+        return jsonify({'success': False, 'error': t('schedule.read_only.upload_files')}), 403
 
     if 'schedule' not in request.files:
-        return jsonify({'success': False, 'error': 'No schedule file provided'}), 400
+        return jsonify({'success': False, 'error': t('schedule.no_schedule_file')}), 400
 
     schedule_file = request.files['schedule']
     if not schedule_file.filename:
-        return jsonify({'success': False, 'error': 'Empty filename'}), 400
+        return jsonify({'success': False, 'error': t('schedule.empty_filename')}), 400
 
     language = request.form.get('language', 'en')
     fmt = request.form.get('format', 'html')
@@ -973,7 +974,7 @@ def upload_and_analyze(analysis_id):
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -983,7 +984,7 @@ def upload_and_analyze(analysis_id):
             """, (analysis_id, user['user_id']))
             analysis = cur.fetchone()
             if not analysis:
-                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.analysis_not_found')}), 404
 
             cur.execute("""
                 UPDATE schedule_analyses
@@ -996,7 +997,7 @@ def upload_and_analyze(analysis_id):
     except Exception as e:
         conn.rollback()
         print(f"Error saving file: {e}")
-        return jsonify({'success': False, 'error': 'Failed to save file'}), 500
+        return jsonify({'success': False, 'error': t('schedule.file_save_failed')}), 500
     finally:
         conn.close()
 
@@ -1016,7 +1017,7 @@ def upload_and_analyze(analysis_id):
 
         conn2 = get_db_connection()
         if not conn2:
-            return jsonify({'success': False, 'error': 'Database error after processing'}), 500
+            return jsonify({'success': False, 'error': t('common.db_error_after_processing')}), 500
 
         try:
             if resp.status_code == 200:
@@ -1063,7 +1064,7 @@ def upload_and_analyze(analysis_id):
                     'filename': filename,
                 })
             else:
-                error_msg = f'Agent returned {resp.status_code}'
+                error_msg = t('chat.agent_status', status=resp.status_code)
                 try:
                     error_data = resp.json()
                     error_msg = error_data.get('detail', error_msg)
@@ -1098,11 +1099,11 @@ def upload_and_analyze(analysis_id):
                     conn3.commit()
             finally:
                 conn3.close()
-        return jsonify({'success': False, 'error': 'Analysis timed out after 5 minutes'}), 504
+        return jsonify({'success': False, 'error': t('schedule.analysis_timeout')}), 504
 
     except http_requests.exceptions.ConnectionError as e:
         print(f"🔌 Azure predictive agent connection error: {e}")
-        return jsonify({'success': False, 'error': 'Could not connect to the AI agent'}), 502
+        return jsonify({'success': False, 'error': t('common.agent_unreachable')}), 502
 
     except Exception as e:
         print(f"❌ Schedule analysis error: {e}")
@@ -1113,17 +1114,17 @@ def upload_and_analyze(analysis_id):
 def v2_upload_and_analyze(analysis_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     if user.get('role') == 'read_only_user':
-        return jsonify({'success': False, 'error': 'Read-only users cannot upload files'}), 403
+        return jsonify({'success': False, 'error': t('schedule.read_only.upload_files')}), 403
 
     if 'schedule' not in request.files:
-        return jsonify({'success': False, 'error': 'No schedule file provided'}), 400
+        return jsonify({'success': False, 'error': t('schedule.no_schedule_file')}), 400
 
     schedule_file = request.files['schedule']
     if not schedule_file.filename:
-        return jsonify({'success': False, 'error': 'Empty filename'}), 400
+        return jsonify({'success': False, 'error': t('schedule.empty_filename')}), 400
 
     language = request.form.get('language', 'en')
     fmt = request.form.get('format', 'html')
@@ -1134,7 +1135,7 @@ def v2_upload_and_analyze(analysis_id):
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1144,7 +1145,7 @@ def v2_upload_and_analyze(analysis_id):
             """, (analysis_id, user['user_id']))
             analysis = cur.fetchone()
             if not analysis:
-                return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.analysis_not_found')}), 404
 
             cur.execute("""
                 UPDATE schedule_analyses
@@ -1157,7 +1158,7 @@ def v2_upload_and_analyze(analysis_id):
     except Exception as e:
         conn.rollback()
         print(f"Error saving file for v2: {e}")
-        return jsonify({'success': False, 'error': 'Failed to save file'}), 500
+        return jsonify({'success': False, 'error': t('schedule.file_save_failed')}), 500
     finally:
         conn.close()
 
@@ -1176,7 +1177,7 @@ def v2_upload_and_analyze(analysis_id):
         print(f"✅ [v2/NUSF] Agent accepted job: {resp.status_code}")
 
         if resp.status_code != 200:
-            error_msg = f'Agent returned {resp.status_code}'
+            error_msg = t('chat.agent_status', status=resp.status_code)
             try:
                 error_msg = resp.json().get('detail', error_msg)
             except Exception:
@@ -1208,9 +1209,9 @@ def v2_upload_and_analyze(analysis_id):
         })
 
     except http_requests.exceptions.Timeout:
-        return jsonify({'success': False, 'error': 'Agent did not accept job within timeout'}), 504
+        return jsonify({'success': False, 'error': t('common.agent_timeout')}), 504
     except http_requests.exceptions.ConnectionError as e:
-        return jsonify({'success': False, 'error': 'Could not connect to the AI agent'}), 502
+        return jsonify({'success': False, 'error': t('common.agent_unreachable')}), 502
     except Exception as e:
         print(f"❌ [v2/NUSF] Upload error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1220,7 +1221,7 @@ def v2_upload_and_analyze(analysis_id):
 def v2_get_analysis_progress(analysis_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     try:
         resp = http_requests.get(
@@ -1230,7 +1231,7 @@ def v2_get_analysis_progress(analysis_id):
         )
 
         if resp.status_code != 200:
-            return jsonify({'stage': 'unknown', 'message': 'Waiting...', 'step': 0, 'total_steps': 6}), 200
+            return jsonify({'stage': 'unknown', 'message': t('schedule.waiting'), 'step': 0, 'total_steps': 6}), 200
 
         data = resp.json()
 
@@ -1262,18 +1263,18 @@ def v2_get_analysis_progress(analysis_id):
 
     except Exception as e:
         print(f"❌ [v2/NUSF] Progress poll error: {e}")
-        return jsonify({'stage': 'unknown', 'message': 'Waiting...', 'step': 0, 'total_steps': 6}), 200
+        return jsonify({'stage': 'unknown', 'message': t('schedule.waiting'), 'step': 0, 'total_steps': 6}), 200
 
 
 @schedule_bp.route('/comparisons', methods=['GET'])
 def list_comparisons():
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1305,10 +1306,10 @@ def list_comparisons():
 def create_comparison():
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     if user.get('role') == 'read_only_user':
-        return jsonify({'success': False, 'error': 'Read-only users cannot create comparisons'}), 403
+        return jsonify({'success': False, 'error': t('schedule.read_only.create_comparisons')}), 403
 
     data = request.get_json() or {}
     comparison_id = data.get('comparison_id') or f"cmp_{secrets.token_hex(8)}"
@@ -1318,7 +1319,7 @@ def create_comparison():
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1371,11 +1372,11 @@ def create_comparison():
 def get_comparison(comparison_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1387,7 +1388,7 @@ def get_comparison(comparison_id):
             comparison = cur.fetchone()
 
             if not comparison:
-                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_found')}), 404
 
             if comparison.get('created_at'):
                 comparison['created_at'] = comparison['created_at'].isoformat()
@@ -1408,7 +1409,7 @@ def get_public_shared_comparison(comparison_id):
     language = request.args.get('language')
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1422,10 +1423,10 @@ def get_public_shared_comparison(comparison_id):
             comparison = cur.fetchone()
 
             if not comparison:
-                return jsonify({'success': False, 'error': 'Shared dashboard not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.shared_dashboard_not_found')}), 404
 
             if comparison.get('status') != 'completed' or not comparison.get('dashboard_html'):
-                return jsonify({'success': False, 'error': 'Dashboard is not ready to share'}), 404
+                return jsonify({'success': False, 'error': t('schedule.dashboard_not_ready_to_share')}), 404
 
             _isoformat_dates(comparison, 'created_at', 'updated_at')
             comparison = _localize_comparison_payload(comparison, language)
@@ -1443,11 +1444,11 @@ def get_public_shared_comparison(comparison_id):
 def download_comparison_pdf(comparison_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1460,10 +1461,10 @@ def download_comparison_pdf(comparison_id):
             comparison = cur.fetchone()
 
             if not comparison:
-                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_found')}), 404
 
             if comparison.get('status') != 'completed' or not comparison.get('dashboard_html'):
-                return jsonify({'success': False, 'error': 'Comparison dashboard not yet completed'}), 400
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_completed')}), 400
 
             if comparison.get('created_at') and hasattr(comparison['created_at'], 'isoformat'):
                 comparison['created_at'] = comparison['created_at'].isoformat()
@@ -1496,14 +1497,14 @@ def get_comparison_source_document(comparison_id, schedule_role):
     """Authenticated, tenant-scoped comparison source document endpoint (TL-9.1, Brief §24)."""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     if schedule_role not in ('old', 'new'):
-        return jsonify({'success': False, 'error': "schedule_role must be 'old' or 'new'"}), 400
+        return jsonify({'success': False, 'error': t('schedule.invalid_schedule_role')}), 400
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1515,7 +1516,7 @@ def get_comparison_source_document(comparison_id, schedule_role):
             """, (comparison_id, user['user_id']))
             comparison = cur.fetchone()
             if not comparison:
-                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_found')}), 404
 
             filename = comparison['old_filename'] if schedule_role == 'old' else comparison['new_filename']
             file_data = comparison.get('old_file_data') if schedule_role == 'old' else comparison.get('new_file_data')
@@ -1529,12 +1530,12 @@ def get_comparison_source_document(comparison_id, schedule_role):
                 try:
                     page_num = int(page_arg)
                 except ValueError:
-                    return jsonify({'success': False, 'error': 'page must be an integer'}), 400
+                    return jsonify({'success': False, 'error': t('schedule.page_must_be_integer')}), 400
 
                 # Check non-paginated degradation (CSV, Excel, MPP, XML)
                 fn_lower = (filename or '').lower().strip()
                 if any(fn_lower.endswith(ext) for ext in ('.csv', '.xlsx', '.xls', '.mpp', '.xml')):
-                    return jsonify({'success': False, 'error': 'Source document is not a paginated PDF'}), 400
+                    return jsonify({'success': False, 'error': t('schedule.source_not_paginated_pdf')}), 400
 
                 if file_data and bytes(file_data).startswith(b"%PDF"):
                     # Forward to agent to render highlight
@@ -1566,13 +1567,13 @@ def get_comparison_source_document(comparison_id, schedule_role):
                         import io
                         return send_file(io.BytesIO(resp.content), mimetype='image/png')
                     else:
-                        return jsonify({'success': False, 'error': 'Source page could not be rendered'}), resp.status_code
+                        return jsonify({'success': False, 'error': t('schedule.source_page_render_failed')}), resp.status_code
                 else:
-                    return jsonify({'success': False, 'error': 'Source document not available for rendering'}), 404
+                    return jsonify({'success': False, 'error': t('schedule.source_not_available')}), 404
 
             # If page is not requested, return raw file
             if not file_data:
-                return jsonify({'success': False, 'error': 'Source document bytes not stored'}), 404
+                return jsonify({'success': False, 'error': t('schedule.source_bytes_not_stored')}), 404
 
             import io
             mimetype = _schedule_mime_type(filename or 'schedule.pdf')
@@ -1594,11 +1595,11 @@ def get_comparison_audit_trail(comparison_id):
     """Authenticated, tenant-scoped comparison audit reconstruction endpoint (TL-9.2, Brief §40)."""
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1610,7 +1611,7 @@ def get_comparison_audit_trail(comparison_id):
             """, (comparison_id, user['user_id']))
             comparison = cur.fetchone()
             if not comparison:
-                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_found')}), 404
 
             # Attempt to retrieve from agent's cryptographic audit store
             try:
@@ -1653,19 +1654,19 @@ def get_comparison_audit_trail(comparison_id):
 def rename_comparison(comparison_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     if user.get('role') == 'read_only_user':
-        return jsonify({'success': False, 'error': 'Read-only users cannot rename comparisons'}), 403
+        return jsonify({'success': False, 'error': t('schedule.read_only.rename_comparisons')}), 403
 
     data = request.get_json() or {}
     title = data.get('title', '').strip()
     if not title:
-        return jsonify({'success': False, 'error': 'Title is required'}), 400
+        return jsonify({'success': False, 'error': t('schedule.title_required')}), 400
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -1679,7 +1680,7 @@ def rename_comparison(comparison_id):
             conn.commit()
 
             if not comparison:
-                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_found')}), 404
 
             return jsonify({'success': True, 'comparison': comparison})
     except Exception as e:
@@ -1694,14 +1695,14 @@ def rename_comparison(comparison_id):
 def delete_comparison(comparison_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     if user.get('role') == 'read_only_user':
-        return jsonify({'success': False, 'error': 'Read-only users cannot delete comparisons'}), 403
+        return jsonify({'success': False, 'error': t('schedule.read_only.delete_comparisons')}), 403
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor() as cur:
@@ -1714,9 +1715,9 @@ def delete_comparison(comparison_id):
             conn.commit()
 
             if not deleted:
-                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_found')}), 404
 
-            return jsonify({'success': True, 'message': 'Comparison deleted'})
+            return jsonify({'success': True, 'message': t('schedule.comparison_deleted')})
     except Exception as e:
         conn.rollback()
         print(f"Error deleting comparison: {e}")
@@ -1729,10 +1730,10 @@ def delete_comparison(comparison_id):
 def generate_comparison(comparison_id):
     user = get_current_user()
     if not user:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
     if user.get('role') == 'read_only_user':
-        return jsonify({'success': False, 'error': 'Read-only users cannot generate comparisons'}), 403
+        return jsonify({'success': False, 'error': t('schedule.read_only.generate_comparisons')}), 403
 
     data = request.get_json() or {}
     session_id = data.get('session_id', '')
@@ -1750,7 +1751,7 @@ def generate_comparison(comparison_id):
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
     try:
         with conn.cursor() as cur:
@@ -1765,7 +1766,7 @@ def generate_comparison(comparison_id):
                   use_nusf, comparison_id, user['user_id']))
             if cur.rowcount == 0:
                 conn.commit()
-                return jsonify({'success': False, 'error': 'Comparison not found'}), 404
+                return jsonify({'success': False, 'error': t('schedule.comparison_not_found')}), 404
             cur.execute("""
                 UPDATE schedule_comparisons sc
                 SET old_file_data = COALESCE(sc.old_file_data, ssf.old_file_data),
@@ -1818,7 +1819,7 @@ def generate_comparison(comparison_id):
 
         conn = get_db_connection()
         if not conn:
-            return jsonify({'success': False, 'error': 'Database error after processing'}), 500
+            return jsonify({'success': False, 'error': t('common.db_error_after_processing')}), 500
 
         try:
             with conn.cursor() as cur:

@@ -6,7 +6,6 @@ import { localizePredictiveReportHtml } from '../utils/reportLocalization';
 import { exportDashboardPdfViaServer } from '../utils/exportPdf';
 import { buildDashboardShareUrl, copyTextToClipboard } from '../utils/shareLinks';
 import AnalysisPageShell from './AnalysisPageShell';
-import ScheduleAnalysisSidebar from './ScheduleAnalysisSidebar';
 
 const SCHEDULE_NAV_SECTIONS = [
   { id: 'predictive-schedule-outlook',      labelEn: 'Schedule Outlook',       labelDa: 'Tidsplan Udsigt' },
@@ -270,8 +269,13 @@ const ScheduleAnalysis = () => {
     }
   };
 
+  // Guards against spamming "New": the ref blocks rapid clicks before re-render,
+  // and an untouched analysis (no file yet) is kept instead of creating another.
+  const isCreatingRef = useRef(false);
   const handleNewAnalysis = async () => {
-    if (isCreating) return;
+    if (isCreatingRef.current) return;
+    if (activeAnalysis && !activeAnalysis.filename && activeAnalysis.status === 'pending') return;
+    isCreatingRef.current = true;
     setIsCreating(true);
     try {
       const analysisId = scheduleService.generateAnalysisId();
@@ -287,6 +291,7 @@ const ScheduleAnalysis = () => {
     } catch (err) {
       console.error('Failed to create analysis:', err);
     } finally {
+      isCreatingRef.current = false;
       setIsCreating(false);
     }
   };
@@ -976,21 +981,18 @@ const ScheduleAnalysis = () => {
 
   return (
     <AnalysisPageShell
-      sidebar={(
-        <ScheduleAnalysisSidebar
-          analyses={analyses}
-          activeAnalysisId={activeAnalysisId}
-          onSelectAnalysis={setActiveAnalysisId}
-          onNewAnalysis={handleNewAnalysis}
-          onDeleteAnalysis={handleDeleteAnalysis}
-          onRenameAnalysis={handleRenameAnalysis}
-          onShareAnalysis={handleShareAnalysis}
-          isLoadingList={isLoadingList}
-          isCreating={isCreating}
-          isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
-        />
-      )}
+      sidebarProps={{
+        analyses: analyses,
+        activeAnalysisId: activeAnalysisId,
+        onSelectAnalysis: setActiveAnalysisId,
+        onNewAnalysis: handleNewAnalysis,
+        onDeleteAnalysis: handleDeleteAnalysis,
+        onRenameAnalysis: handleRenameAnalysis,
+        onShareAnalysis: handleShareAnalysis,
+        isLoadingList: isLoadingList,
+        isCreating: isCreating,
+        onToggle: () => setSidebarOpen(!sidebarOpen),
+      }}
       sidebarOpen={sidebarOpen}
       onOpenSidebar={() => setSidebarOpen(true)}
       errorBanner={error && (

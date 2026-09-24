@@ -46,6 +46,9 @@ CORS(app,
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      supports_credentials=True)
 
+from middleware.rate_limiter import register_rate_limiters
+register_rate_limiters(app)
+
 
 @app.after_request
 def add_security_headers(response):
@@ -81,40 +84,8 @@ if not JWT_SECRET:
 app.config['SECRET_KEY'] = JWT_SECRET
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB
 
-# Database configuration - prioritize DATABASE_URL for Replit
-DATABASE_URL = os.getenv('DATABASE_URL')
-DB_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'database': os.getenv('DB_NAME', 'postgres'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', ''),
-    'port': os.getenv('DB_PORT', 5432)
-}
-
-
-def get_db_connection():
-    """Create a database connection"""
-    try:
-        # First try to use DATABASE_URL (Replit's standard)
-        database_url = os.getenv('DATABASE_URL')
-        if database_url:
-            conn = psycopg2.connect(database_url)
-            return conn
-
-        # Fallback to individual environment variables
-        db_config = {
-            'host': os.getenv('DB_HOST', 'localhost'),
-            'database': os.getenv('DB_NAME', 'postgres'),
-            'user': os.getenv('DB_USER', 'postgres'),
-            'password': os.getenv('DB_PASSWORD', ''),
-            'port': os.getenv('DB_PORT', 5432),
-            'sslmode': os.getenv('DB_SSLMODE', 'require')
-        }
-        conn = psycopg2.connect(**db_config)
-        return conn
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        return None
+from utils.database import get_db_connection
+from utils.i18n import t
 
 
 def validate_email(email):
@@ -255,13 +226,13 @@ def verify_token():
         if not token:
             return jsonify({
                 'success': False,
-                'message': 'Token is required'
+                'message': t('auth.token_required')
             }), 400
 
         try:
             from utils.token_manager import is_token_blacklisted
             if is_token_blacklisted(token):
-                return jsonify({'success': False, 'message': 'Token has been revoked'}), 401
+                return jsonify({'success': False, 'message': t('auth.token_revoked')}), 401
             
             payload = jwt.decode(token,
                                  app.config['SECRET_KEY'],
@@ -272,7 +243,7 @@ def verify_token():
             if not conn:
                 return jsonify({
                     'success': False,
-                    'message': 'Database connection failed'
+                    'message': t('common.db_connection_failed')
                 }), 500
 
             try:
@@ -288,7 +259,7 @@ def verify_token():
                     if not user:
                         return jsonify({
                             'success': False,
-                            'message': 'User not found'
+                            'message': t('user.not_found')
                         }), 404
 
                     return jsonify({
@@ -307,16 +278,16 @@ def verify_token():
         except jwt.ExpiredSignatureError:
             return jsonify({
                 'success': False,
-                'message': 'Token has expired'
+                'message': t('auth.token_expired')
             }), 401
         except jwt.InvalidTokenError:
-            return jsonify({'success': False, 'message': 'Invalid token'}), 401
+            return jsonify({'success': False, 'message': t('auth.invalid_token')}), 401
 
     except Exception as e:
         print(f"Token verification error: {e}")
         return jsonify({
             'success': False,
-            'message': 'Token verification failed'
+            'message': t('auth.token_verification_failed')
         }), 400
 
 
@@ -336,7 +307,7 @@ def logout():
             token = request.cookies.get('accessToken')
         
         if not token:
-            resp = jsonify({'success': True, 'message': 'Logout successful'})
+            resp = jsonify({'success': True, 'message': t('auth.logout_success')})
             is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
             resp.set_cookie('accessToken', '', expires=0, path='/', samesite='None', secure=is_secure)
             resp.set_cookie('refreshToken', '', expires=0, path='/api/', samesite='None', secure=is_secure)
@@ -381,20 +352,20 @@ def logout():
                 event_description=f"User logged out"
             )
 
-            resp = jsonify({'success': True, 'message': 'Logout successful'})
+            resp = jsonify({'success': True, 'message': t('auth.logout_success')})
             is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
             resp.set_cookie('accessToken', '', expires=0, path='/', samesite='None', secure=is_secure)
             resp.set_cookie('refreshToken', '', expires=0, path='/api/', samesite='None', secure=is_secure)
             return resp, 200
 
         except jwt.ExpiredSignatureError:
-            resp = jsonify({'success': True, 'message': 'Logout successful'})
+            resp = jsonify({'success': True, 'message': t('auth.logout_success')})
             is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
             resp.set_cookie('accessToken', '', expires=0, path='/', samesite='None', secure=is_secure)
             resp.set_cookie('refreshToken', '', expires=0, path='/api/', samesite='None', secure=is_secure)
             return resp, 200
         except jwt.InvalidTokenError:
-            resp = jsonify({'success': False, 'message': 'Invalid token'})
+            resp = jsonify({'success': False, 'message': t('auth.invalid_token')})
             is_secure = request.scheme == 'https' or request.headers.get('X-Forwarded-Proto') == 'https'
             resp.set_cookie('accessToken', '', expires=0, path='/', samesite='None', secure=is_secure)
             resp.set_cookie('refreshToken', '', expires=0, path='/api/', samesite='None', secure=is_secure)
@@ -402,7 +373,7 @@ def logout():
 
     except Exception as e:
         print(f"Logout error: {e}")
-        return jsonify({'success': False, 'message': 'Logout failed. Please try again.'}), 500
+        return jsonify({'success': False, 'message': t('auth.logout_failed')}), 500
 
 
 
@@ -472,7 +443,7 @@ def upload_files():
         print(f"File upload error: {e}")
         return jsonify({
             'success': False,
-            'message': f'File upload failed: {str(e)}'
+            'message': t('common.file_upload_failed_detail', detail=str(e))
         }), 500
 
 
@@ -499,7 +470,6 @@ def api_info():
         'version': '1.0.0',
         'endpoints': {
             'auth': {
-                'POST /api/signup': 'Register new user',
                 'POST /api/login': 'User login',
                 'POST /api/logout': 'User logout',
                 'POST /api/verify-token': 'Verify JWT token',
@@ -576,7 +546,7 @@ def serve_frontend(path):
     """Serve frontend files in production"""
     # Skip API routes and uploads - they are handled by other routes
     if path.startswith('api/') or path.startswith('api') or path.startswith('uploads/'):
-        return jsonify({'error': 'Not found'}), 404
+        return jsonify({'error': t('common.not_found')}), 404
     
     # Check if dist folder exists
     if not os.path.exists(FRONTEND_DIST_PATH):

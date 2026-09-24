@@ -5,6 +5,7 @@ CRUD operations for users - Admin only access
 from flask import Blueprint, request, jsonify
 import bcrypt
 from utils.database import get_db_connection
+from utils.i18n import t
 from utils.validators import validate_email, validate_password, validate_name
 from middleware.admin_auth import admin_required
 from psycopg2.extras import RealDictCursor
@@ -73,7 +74,7 @@ def get_all_users():
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -165,7 +166,7 @@ def get_all_users():
         print(f"Get users error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Kunne ikke hente brugere',
+            'error': t('user.list_fetch_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
 
@@ -184,7 +185,7 @@ def create_user():
         if not data:
             return jsonify({
                 'success': False,
-                'error': 'Anmodningsdata påkrævet',
+                'error': t('common.request_data_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -240,14 +241,14 @@ def create_user():
         if not company_name:
             return jsonify({
                 'success': False,
-                'error': 'Firmanavn er påkrævet',
+                'error': t('company.name_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
         if role not in ['user', 'admin']:
             return jsonify({
                 'success': False,
-                'error': 'Ugyldig rolle. Skal være "user" eller "admin"',
+                'error': t('user.invalid_role_admin'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -255,7 +256,7 @@ def create_user():
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -267,7 +268,7 @@ def create_user():
                 if existing_user:
                     return jsonify({
                         'success': False,
-                        'error': 'Bruger med denne e-mail eksisterer allerede',
+                        'error': t('user.email_exists'),
                         'code': 'EMAIL_EXISTS'
                     }), 400
                 
@@ -294,7 +295,7 @@ def create_user():
                 
                 return jsonify({
                     'success': True,
-                    'message': 'Bruger oprettet med succes',
+                    'message': t('user.created'),
                     'user': format_user_response(new_user)
                 }), 201
                 
@@ -303,7 +304,7 @@ def create_user():
             print(f"Create user error: {e}")
             return jsonify({
                 'success': False,
-                'error': 'Brugeroprettelse fejlede',
+                'error': t('user.create_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -313,7 +314,7 @@ def create_user():
         print(f"Create user request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Ugyldig anmodningsdata',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400
 
@@ -328,7 +329,7 @@ def update_user(user_id):
         if not data:
             return jsonify({
                 'success': False,
-                'error': 'Anmodningsdata påkrævet',
+                'error': t('common.request_data_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
         
@@ -336,7 +337,7 @@ def update_user(user_id):
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -348,7 +349,7 @@ def update_user(user_id):
                 if not existing_user:
                     return jsonify({
                         'success': False,
-                        'error': 'Bruger ikke fundet',
+                        'error': t('user.not_found'),
                         'code': 'NOT_FOUND'
                     }), 404
                 
@@ -394,7 +395,7 @@ def update_user(user_id):
                         if cur.fetchone():
                             return jsonify({
                                 'success': False,
-                                'error': 'E-mail er allerede i brug',
+                                'error': t('user.email_in_use'),
                                 'code': 'EMAIL_EXISTS'
                             }), 400
                     
@@ -424,7 +425,7 @@ def update_user(user_id):
                     if role not in ['user', 'admin']:
                         return jsonify({
                             'success': False,
-                            'error': 'Ugyldig rolle. Skal være "user" eller "admin"',
+                            'error': t('user.invalid_role_admin'),
                             'code': 'VALIDATION_ERROR'
                         }), 400
                     update_fields.append("role = %s")
@@ -465,7 +466,7 @@ def update_user(user_id):
                 if not update_fields:
                     return jsonify({
                         'success': False,
-                        'error': 'Ingen felter at opdatere',
+                        'error': t('common.no_fields_to_update'),
                         'code': 'VALIDATION_ERROR'
                     }), 400
                 
@@ -487,7 +488,7 @@ def update_user(user_id):
                 
                 return jsonify({
                     'success': True,
-                    'message': 'Bruger opdateret med succes',
+                    'message': t('user.updated'),
                     'user': format_user_response(updated_user)
                 }), 200
                 
@@ -496,7 +497,7 @@ def update_user(user_id):
             print(f"Update user error: {e}")
             return jsonify({
                 'success': False,
-                'error': 'Brugeropdatering fejlede',
+                'error': t('user.update_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -506,7 +507,7 @@ def update_user(user_id):
         print(f"Update user request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Ugyldig anmodningsdata',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400
 
@@ -519,7 +520,7 @@ def delete_user(user_id):
         if user_id == request.current_user_id:
             return jsonify({
                 'success': False,
-                'error': 'Du kan ikke slette din egen konto',
+                'error': t('user.cannot_delete_self'),
                 'code': 'FORBIDDEN'
             }), 403
         
@@ -527,7 +528,7 @@ def delete_user(user_id):
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -539,7 +540,7 @@ def delete_user(user_id):
                 if not user:
                     return jsonify({
                         'success': False,
-                        'error': 'Bruger ikke fundet',
+                        'error': t('user.not_found'),
                         'code': 'NOT_FOUND'
                     }), 404
                 
@@ -551,7 +552,7 @@ def delete_user(user_id):
                 
                 return jsonify({
                     'success': True,
-                    'message': f'Bruger {user["email"]} slettet med succes'
+                    'message': t('user.deleted', email=user['email'])
                 }), 200
                 
         except Exception as e:
@@ -559,7 +560,7 @@ def delete_user(user_id):
             print(f"Delete user error: {e}")
             return jsonify({
                 'success': False,
-                'error': 'Brugersletning fejlede',
+                'error': t('user.delete_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -569,7 +570,7 @@ def delete_user(user_id):
         print(f"Delete user request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Ugyldig anmodningsdata',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400
 
@@ -583,7 +584,7 @@ def get_user(user_id):
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -600,7 +601,7 @@ def get_user(user_id):
                 if not user:
                     return jsonify({
                         'success': False,
-                        'error': 'Bruger ikke fundet',
+                        'error': t('user.not_found'),
                         'code': 'NOT_FOUND'
                     }), 404
                 
@@ -616,14 +617,14 @@ def get_user(user_id):
         print(f"Get user error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Kunne ikke hente bruger',
+            'error': t('user.fetch_failed'),
             'code': 'INTERNAL_ERROR'
         }), 500
 
 
 # ── Brief §43 Trust Center Admin Routes (TL-9.5) ─────────────────────────────
 import os
-import requests as http_requests
+from utils import agent_http as http_requests
 
 AGENT_BASE_URL = os.getenv('AGENT_BASE_URL', 'https://nova-ai-backend-dga5ffaudzceb0hr.japanwest-01.azurewebsites.net')
 
@@ -637,7 +638,7 @@ def get_trust_center_summary():
 
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
     company_id = None
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -669,7 +670,7 @@ def get_trust_center_summary():
     # Fallback with strict company_id isolation
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'error': 'Database error'}), 500
+        return jsonify({'success': False, 'error': t('common.db_error')}), 500
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""

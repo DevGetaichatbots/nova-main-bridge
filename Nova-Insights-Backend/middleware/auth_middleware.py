@@ -1,6 +1,7 @@
 from functools import wraps
 from flask import request, jsonify
 from utils.token_manager import verify_access_token
+from utils.i18n import t
 from utils.database import get_db_connection
 from psycopg2.extras import RealDictCursor
 
@@ -24,7 +25,7 @@ def require_auth(f):
         if not token:
             return jsonify({
                 'success': False,
-                'error': 'Ikke autoriseret',
+                'error': t('common.unauthorized'),
                 'code': 'UNAUTHORIZED'
             }), 401
         
@@ -32,7 +33,7 @@ def require_auth(f):
         if error:
             return jsonify({
                 'success': False,
-                'error': 'Ugyldig eller udløbet token',
+                'error': t('auth.invalid_or_expired_token'),
                 'code': 'INVALID_TOKEN'
             }), 401
         
@@ -40,7 +41,7 @@ def require_auth(f):
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'DB_ERROR'
             }), 500
         
@@ -62,15 +63,22 @@ def require_auth(f):
                 if not user:
                     return jsonify({
                         'success': False,
-                        'error': 'Bruger ikke fundet',
+                        'error': t('user.not_found'),
                         'code': 'USER_NOT_FOUND'
                     }), 404
                 
                 if user.get('is_active') == False:
                     return jsonify({
                         'success': False,
-                        'error': 'Account is deactivated',
+                        'error': t('auth.account_deactivated'),
                         'code': 'ACCOUNT_DEACTIVATED'
+                    }), 401
+
+                if user.get('company_active') == False:
+                    return jsonify({
+                        'success': False,
+                        'error': t('auth.company_deactivated_contact_admin'),
+                        'code': 'COMPANY_DEACTIVATED'
                     }), 401
                 
                 request.current_user = user
@@ -90,7 +98,7 @@ def require_reset_token(f):
         if not auth_header:
             return jsonify({
                 'success': False,
-                'error': 'Nulstillingstoken påkrævet',
+                'error': t('auth.reset_token_required'),
                 'code': 'UNAUTHORIZED'
             }), 401
         
@@ -113,7 +121,7 @@ def require_reset_token(f):
         except Exception as e:
             return jsonify({
                 'success': False,
-                'error': 'Ugyldig token',
+                'error': t('auth.invalid_token'),
                 'code': 'INVALID_TOKEN'
             }), 401
     

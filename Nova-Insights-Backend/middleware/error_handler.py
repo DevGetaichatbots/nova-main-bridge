@@ -1,5 +1,6 @@
 from flask import jsonify
 import traceback
+from utils.i18n import t
 
 
 class APIError(Exception):
@@ -32,7 +33,7 @@ def register_error_handlers(app):
         """Handle 400 errors"""
         return jsonify({
             'success': False,
-            'error': 'Ugyldig anmodning',
+            'error': t('common.invalid_request'),
             'code': 'BAD_REQUEST'
         }), 400
     
@@ -41,7 +42,7 @@ def register_error_handlers(app):
         """Handle 401 errors"""
         return jsonify({
             'success': False,
-            'error': 'Ikke autoriseret',
+            'error': t('common.unauthorized'),
             'code': 'UNAUTHORIZED'
         }), 401
     
@@ -50,7 +51,7 @@ def register_error_handlers(app):
         """Handle 403 errors"""
         return jsonify({
             'success': False,
-            'error': 'Forbudt',
+            'error': t('common.forbidden'),
             'code': 'FORBIDDEN'
         }), 403
     
@@ -59,7 +60,7 @@ def register_error_handlers(app):
         """Handle 404 errors for API routes"""
         return jsonify({
             'success': False,
-            'error': 'Ikke fundet',
+            'error': t('common.not_found'),
             'code': 'NOT_FOUND'
         }), 404
     
@@ -68,7 +69,7 @@ def register_error_handlers(app):
         """Handle 429 errors"""
         return jsonify({
             'success': False,
-            'error': 'For mange forsøg. Prøv igen senere',
+            'error': t('common.too_many_attempts'),
             'code': 'RATE_LIMIT_EXCEEDED'
         }), 429
     
@@ -79,7 +80,7 @@ def register_error_handlers(app):
         print(traceback.format_exc())
         return jsonify({
             'success': False,
-            'error': 'Intern serverfejl',
+            'error': t('common.internal_error'),
             'code': 'INTERNAL_ERROR'
         }), 500
     
@@ -90,6 +91,6 @@ def register_error_handlers(app):
         print(traceback.format_exc())
         return jsonify({
             'success': False,
-            'error': 'Der opstod en uventet fejl',
+            'error': t('common.unexpected_error'),
             'code': 'UNEXPECTED_ERROR'
         }), 500

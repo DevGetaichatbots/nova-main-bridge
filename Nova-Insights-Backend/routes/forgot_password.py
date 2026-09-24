@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify
 from utils.database import get_db_connection
+from utils.i18n import t
 from utils.email_service import generate_otp, send_otp_email
 from utils.validators import validate_email
-from utils.redis_client import rate_limit_check
 from datetime import datetime, timedelta
 from psycopg2.extras import RealDictCursor
 
@@ -21,21 +21,9 @@ def forgot_password():
         if not data:
             return jsonify({
                 'success': False,
-                'error': 'Anmodningsdata påkrævet',
+                'error': t('common.request_data_required'),
                 'code': 'VALIDATION_ERROR'
             }), 400
-        
-        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-        rate_key = f"rate_limit:forgot_password:{client_ip}"
-        allowed, remaining, reset_time = rate_limit_check(rate_key, 3, 900)
-        
-        if not allowed:
-            return jsonify({
-                'success': False,
-                'error': 'For mange nulstillingsanmodninger. Prøv igen senere.',
-                'code': 'RATE_LIMITED',
-                'retryAfter': reset_time
-            }), 429
         
         email = data.get('email', '').strip().lower()
         
@@ -51,7 +39,7 @@ def forgot_password():
         if not conn:
             return jsonify({
                 'success': False,
-                'error': 'Database forbindelse fejlede',
+                'error': t('common.db_connection_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         
@@ -63,7 +51,7 @@ def forgot_password():
                 if not user:
                     return jsonify({
                         'success': False,
-                        'error': 'E-mail ikke fundet',
+                        'error': t('otp.email_not_found'),
                         'code': 'EMAIL_NOT_FOUND'
                     }), 404
                 
@@ -87,13 +75,13 @@ def forgot_password():
                 if not success:
                     return jsonify({
                         'success': False,
-                        'error': 'Kunne ikke sende OTP-e-mail. Kontroller venligst e-mail-konfigurationen',
+                        'error': t('otp.send_failed'),
                         'code': 'EMAIL_SEND_FAILED'
                     }), 500
                 
                 return jsonify({
                     'success': True,
-                    'message': 'OTP sendt til din e-mail',
+                    'message': t('otp.sent'),
                     'data': {
                         'email': email,
                         'otpSentAt': otp_record['created_at'].isoformat() + 'Z',
@@ -106,7 +94,7 @@ def forgot_password():
             print(f"Forgot password error: {e}")
             return jsonify({
                 'success': False,
-                'error': 'Kunne ikke behandle anmodningen',
+                'error': t('common.process_request_failed'),
                 'code': 'INTERNAL_ERROR'
             }), 500
         finally:
@@ -116,6 +104,6 @@ def forgot_password():
         print(f"Forgot password request error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Ugyldig anmodningsdata',
+            'error': t('common.invalid_request_data'),
             'code': 'VALIDATION_ERROR'
         }), 400

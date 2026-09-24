@@ -372,7 +372,7 @@ const FileComparisonModal = ({
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-3 md:p-4"
         onClick={handleOverlayClick}
         style={{
           backgroundColor: "rgba(0, 0, 0, 0.85)",
@@ -380,7 +380,7 @@ const FileComparisonModal = ({
         }}
       >
         <div
-          className="relative w-full max-w-5xl max-h-[95vh] rounded-3xl shadow-2xl border animate-modal-in overflow-hidden flex flex-col"
+          className="relative w-full max-w-5xl max-h-[95vh] rounded-2xl md:rounded-3xl shadow-2xl border animate-modal-in overflow-hidden flex flex-col"
           style={{
             background:
               "linear-gradient(145deg, rgba(0, 214, 214, 0.15) 0%, rgba(112, 211, 213, 0.1) 100%)",
@@ -390,14 +390,14 @@ const FileComparisonModal = ({
           onClick={(e) => e.stopPropagation()}
         >
           <div
-            className="px-8 py-6 text-white"
+            className="px-4 py-4 md:px-8 md:py-6 text-white"
             style={{ background: "#1eb5ee" }}
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center border border-white/20">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className="w-9 h-9 md:w-12 md:h-12 flex-shrink-0 rounded-xl md:rounded-2xl bg-white/20 flex items-center justify-center border border-white/20">
                   <svg
-                    className="w-7 h-7 text-white"
+                    className="w-5 h-5 md:w-7 md:h-7 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -411,10 +411,10 @@ const FileComparisonModal = ({
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold text-white">
+                  <h3 className="text-lg md:text-2xl font-bold text-white">
                     {t('fileComparison.title')}
                   </h3>
-                  <p className="text-white/80 text-sm mt-1">
+                  <p className="text-white/80 text-xs md:text-sm mt-0.5 md:mt-1">
                     {t('fileComparison.subtitle')}
                   </p>
                 </div>
@@ -422,10 +422,10 @@ const FileComparisonModal = ({
               {!autoOpened && (
                 <button
                   onClick={handleClose}
-                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 transition-all duration-300 group"
+                  className="p-1.5 md:p-2 flex-shrink-0 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 transition-all duration-300 group"
                 >
                   <svg
-                    className="w-6 h-6 text-white group-hover:scale-110 transition-transform"
+                    className="w-5 h-5 md:w-6 md:h-6 text-white group-hover:scale-110 transition-transform"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -449,7 +449,7 @@ const FileComparisonModal = ({
               backgroundColor: "#f0f9ff",
             }}
           >
-            <div className="p-8 space-y-8">
+            <div className="p-4 md:p-8 space-y-5 md:space-y-8">
               {error && (
                 <div
                   className="p-4 rounded-xl border animate-shake"
@@ -510,10 +510,10 @@ const FileComparisonModal = ({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
                 <div className="space-y-4">
                   <label
-                    className="flex items-center gap-2 text-lg font-semibold"
+                    className="flex items-center gap-2 text-base md:text-lg font-semibold"
                     style={{ color: "#1c2631" }}
                   >
                     <svg
@@ -533,7 +533,7 @@ const FileComparisonModal = ({
                     {t('fileComparison.firstFile')} <span className="text-red-400">*</span>
                   </label>
                   <div
-                    className="relative border-2 border-dashed rounded-2xl p-8 transition-all duration-500 flex flex-col justify-center"
+                    className="relative border-2 border-dashed rounded-2xl p-5 md:p-8 transition-all duration-500 flex flex-col justify-center"
                     style={{
                       minHeight: "220px",
                       cursor: isUploading ? "not-allowed" : "pointer",
@@ -564,7 +564,7 @@ const FileComparisonModal = ({
                     />
                     <div className="text-center flex-1 flex flex-col justify-center">
                       <div
-                        className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 transition-all duration-500"
+                        className="w-12 h-12 md:w-16 md:h-16 mx-auto rounded-xl md:rounded-2xl flex items-center justify-center mb-3 md:mb-4 transition-all duration-500"
                         style={{
                           backgroundColor: isDragging.old
                             ? "rgba(0, 214, 214, 0.3)"
@@ -574,7 +574,7 @@ const FileComparisonModal = ({
                         }}
                       >
                         <svg
-                          className="w-8 h-8 transition-all duration-500"
+                          className="w-6 h-6 md:w-8 md:h-8 transition-all duration-500"
                           style={{
                             color: isDragging.old || oldScheduleFile
                               ? "#1eb5ee"
@@ -593,7 +593,7 @@ const FileComparisonModal = ({
                         </svg>
                       </div>
                       <p
-                        className="font-semibold text-lg mb-3 max-w-full truncate px-2"
+                        className="font-semibold text-base md:text-lg mb-2 md:mb-3 max-w-full truncate px-2"
                         style={{ color: "#1c2631" }}
                         title={oldScheduleFile ? oldScheduleFile.name : ""}
                       >
@@ -618,7 +618,7 @@ const FileComparisonModal = ({
 
                 <div className="space-y-4">
                   <label
-                    className="flex items-center gap-2 text-lg font-semibold"
+                    className="flex items-center gap-2 text-base md:text-lg font-semibold"
                     style={{ color: "#1c2631" }}
                   >
                     <svg
@@ -638,7 +638,7 @@ const FileComparisonModal = ({
                     {t('fileComparison.secondFile')} <span className="text-red-400">*</span>
                   </label>
                   <div
-                    className="relative border-2 border-dashed rounded-2xl p-8 transition-all duration-500 flex flex-col justify-center"
+                    className="relative border-2 border-dashed rounded-2xl p-5 md:p-8 transition-all duration-500 flex flex-col justify-center"
                     style={{
                       minHeight: "220px",
                       cursor: isUploading ? "not-allowed" : "pointer",
@@ -669,7 +669,7 @@ const FileComparisonModal = ({
                     />
                     <div className="text-center flex-1 flex flex-col justify-center">
                       <div
-                        className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 transition-all duration-500"
+                        className="w-12 h-12 md:w-16 md:h-16 mx-auto rounded-xl md:rounded-2xl flex items-center justify-center mb-3 md:mb-4 transition-all duration-500"
                         style={{
                           backgroundColor: isDragging.new
                             ? "rgba(0, 214, 214, 0.3)"
@@ -679,7 +679,7 @@ const FileComparisonModal = ({
                         }}
                       >
                         <svg
-                          className="w-8 h-8 transition-all duration-500"
+                          className="w-6 h-6 md:w-8 md:h-8 transition-all duration-500"
                           style={{
                             color: isDragging.new || newScheduleFile
                               ? "#1eb5ee"
@@ -698,7 +698,7 @@ const FileComparisonModal = ({
                         </svg>
                       </div>
                       <p
-                        className="font-semibold text-lg mb-3 max-w-full truncate px-2"
+                        className="font-semibold text-base md:text-lg mb-2 md:mb-3 max-w-full truncate px-2"
                         style={{ color: "#1c2631" }}
                         title={newScheduleFile ? newScheduleFile.name : ""}
                       >
@@ -861,13 +861,13 @@ const FileComparisonModal = ({
             </div>
           </div>
 
-          <div className="px-8 py-6" style={{ backgroundColor: "#f0f9ff" }}>
-            <div className="flex gap-4">
+          <div className="px-4 py-3 md:px-8 md:py-6" style={{ backgroundColor: "#f0f9ff" }}>
+            <div className="flex gap-3 md:gap-4">
               {!autoOpened && (
                 <button
                   onClick={handleClose}
                   disabled={isUploading}
-                  className="flex-1 px-6 py-3 rounded-xl font-bold transition-all duration-300 hover:scale-[1.02] disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 md:px-6 md:py-3 rounded-xl text-sm md:text-base font-bold transition-all duration-300 hover:scale-[1.02] disabled:opacity-50"
                   style={{
                     color: "#64748b",
                     backgroundColor: "#e2e8f0",
@@ -880,7 +880,7 @@ const FileComparisonModal = ({
               <button
                 onClick={handleUploadBothFiles}
                 disabled={!canUpload}
-                className="flex-1 px-6 py-3 rounded-xl font-bold text-white transition-all duration-300 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2.5 md:px-6 md:py-3 rounded-xl text-sm md:text-base font-bold text-white transition-all duration-300 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: canUpload
                     ? "linear-gradient(135deg, #1eb5ee, #00b8b8)"

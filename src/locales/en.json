@@ -152,6 +152,22 @@
     "files": "Files",
     "readOnlyNoAccess": "Read-only users cannot perform this action"
   },
+  "auth": {
+    "homeLabel": "Nova Insight home",
+    "backHome": "Back to home",
+    "storyLabel": "Why teams use Nova Insight",
+    "eyebrow": "Schedule intelligence",
+    "storyTitle": "Turn schedule changes into clear decisions.",
+    "storyDescription": "Compare complex construction schedules, understand the impact and share the findings your team needs.",
+    "benefitChanges": "See every meaningful schedule change",
+    "benefitRisks": "Identify delays and critical-path risk",
+    "benefitReports": "Create clear, professional reports",
+    "secure": "Secure processing",
+    "azure": "Microsoft Azure",
+    "gdpr": "GDPR compliant",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
+  },
   "login": {
     "title": "Log in",
     "welcomeBack": "Welcome back",
@@ -193,6 +209,8 @@
     "emailPlaceholder": "john@example.com",
     "emailRequired": "Email is required",
     "emailInvalid": "Email is invalid",
+    "ownerEmail": "Owner email address",
+    "ownerEmailHint": "This person will manage the company account and invite team members.",
     "password": "Password",
     "passwordPlaceholder": "Create a strong password",
     "passwordRequired": "Password is required",
@@ -205,6 +223,11 @@
     "acceptTerms": "You must accept the terms and conditions",
     "termsLabel": "I accept the terms and conditions",
     "passwordStrength": "Password strength",
+    "passwordRequirementsTitle": "Your password needs:",
+    "requirementLength": "At least 8 characters",
+    "requirementLowercase": "One lowercase letter",
+    "requirementUppercase": "One uppercase letter",
+    "requirementNumber": "One number",
     "strengthWeak": "Weak",
     "strengthFair": "Fair",
     "strengthGood": "Good",
@@ -214,6 +237,10 @@
     "submitting": "Signing up...",
     "hasAccount": "Already have an account?",
     "loginLink": "Log in",
+    "termsPrefix": "I agree to the",
+    "termsLink": "Terms of Service",
+    "termsAnd": "and",
+    "privacyLink": "Privacy Policy",
     "signupSuccess": "Account created",
     "signupError": "An error occurred during signup",
     "networkError": "Network connection failed. Please check if both frontend and backend are running.",
@@ -686,9 +713,7 @@
     "companyWebsite": "Website",
     "submit": "Register Company",
     "submitting": "Registering...",
-    "signupError": "Registration failed. Please try again.",
-    "individualSignup": "Want to sign up as individual?",
-    "signupHere": "Sign up here"
+    "signupError": "Registration failed. Please try again."
   },
   "companyPortal": {
     "title": "Company Portal",
@@ -1065,6 +1090,157 @@
     "companyInfoDesc": "Nordic AI Group ApS - Enterprise solutions for the construction industry",
     "location": "Copenhagen, Denmark",
     "backToHome": "Back to homepage"
+  },
+  "landing": {
+    "skipLink": "Skip to content",
+    "nav": {
+      "homeLabel": "Nova Insight home",
+      "primaryLabel": "Primary navigation",
+      "mobileLabel": "Mobile navigation",
+      "menuLabel": "Toggle navigation menu",
+      "features": "Features",
+      "pricing": "Pricing",
+      "security": "Security",
+      "faq": "FAQ",
+      "contact": "Contact",
+      "login": "Log in",
+      "getStarted": "Get started",
+      "dashboard": "Open dashboard"
+    },
+    "hero": {
+      "eyebrow": "Construction schedule intelligence",
+      "titleStart": "Compare construction schedules",
+      "titleAccent": "in minutes",
+      "description": "Upload two schedule files and let Nova instantly show you what changed, what matters, and what to do next.",
+      "benefits": {
+        "tools": "Works with Primavera, Microsoft Project and more",
+        "detection": "Clear change detection and visual reports",
+        "simplicity": "No installation. No integration. No complexity."
+      }
+    },
+    "upload": {
+      "title": "Upload your schedules",
+      "instruction": "Drag and drop your files here or choose files to continue",
+      "button": "Choose files",
+      "formats": "Supports .xer, .mpp, .pdf and more",
+      "security": "Log in securely before your files are uploaded"
+    },
+    "integrations": {
+      "label": "Supported planning tools",
+      "trusted": "Trusted workflows, familiar tools",
+      "more": "And many more"
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "description": "From upload to decision-ready insights in three clear steps.",
+      "steps": {
+        "upload": { "title": "Upload", "description": "Add the previous and current versions of your schedule." },
+        "analyze": { "title": "We analyze", "description": "Nova compares both files and identifies every meaningful change." },
+        "insights": { "title": "Get insights", "description": "Receive a clear report with impacts, risks and key takeaways." }
+      }
+    },
+    "benefits": {
+      "eyebrow": "Built for project controls",
+      "titleStart": "Turn complex schedules into",
+      "titleAccent": "clear answers",
+      "description": "Nova Insight helps project managers, consultants, contractors and owners save hours of manual work by comparing schedule revisions and highlighting what is important.",
+      "items": {
+        "changes": "See exactly what has changed",
+        "risks": "Identify delays, risks and critical-path impacts",
+        "reports": "Create a professional PDF report",
+        "tools": "Work with the planning tools you already use"
+      },
+      "cta": "Start comparing now",
+      "note": "No credit card required for the Free plan"
+    },
+    "preview": {
+      "ariaLabel": "Example comparison result",
+      "dashboard": "Dashboard",
+      "comparisons": "Comparisons",
+      "title": "Comparison result",
+      "report": "Download PDF report",
+      "metrics": {
+        "changed": { "value": "247", "label": "Activities changed" },
+        "added": { "value": "18", "label": "Activities added" },
+        "removed": { "value": "12", "label": "Activities removed" },
+        "critical": { "value": "5", "label": "Critical changes" }
+      },
+      "table": { "activity": "Activity", "change": "Change", "impact": "Impact" },
+      "rows": {
+        "foundation": { "activity": "Foundation works", "change": "Modified", "impact": "+14 days", "tone": "modified" },
+        "steel": { "activity": "Steel structure", "change": "Modified", "impact": "+7 days", "tone": "modified" },
+        "facade": { "activity": "Facade installation", "change": "Added", "impact": "—", "tone": "added" },
+        "mep": { "activity": "MEP first fix", "change": "Modified", "impact": "+15 days", "tone": "modified" },
+        "commissioning": { "activity": "Commissioning", "change": "Unchanged", "impact": "—", "tone": "neutral" }
+      },
+      "tabs": { "summary": "Summary", "changed": "Changed", "added": "Added", "critical": "Critical path" }
+    },
+    "security": {
+      "title": "Enterprise-grade security",
+      "description": "Your data is processed securely on Microsoft Azure. Files are never shared and data is handled within EU-compatible frameworks.",
+      "compliant": "Compliant",
+      "ready": "Ready"
+    },
+    "pricing": {
+      "title": "Simple and transparent pricing",
+      "description": "Choose the plan that fits your needs. Upgrade or downgrade at any time.",
+      "billingLabel": "Billing period",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "save": "Save 20%",
+      "popular": "Most popular",
+      "month": "month",
+      "year": "year",
+      "comparisonCount_one": "{{count}} comparison",
+      "comparisonCount_other": "{{count}} comparisons per month",
+      "getStarted": "Get started",
+      "billedYearly": "Billed yearly",
+      "features": {
+        "basicReport": "Basic report",
+        "standardSupport": "Standard support",
+        "fullPdfReport": "Full PDF report",
+        "emailSupport": "Email support",
+        "advancedReports": "Advanced reports",
+        "prioritySupport": "Priority support",
+        "teamAccounts": "Team accounts"
+      },
+      "plans": {
+        "free": { "name": "Free", "audience": "Try Nova Insight" },
+        "starter": { "name": "Starter", "audience": "For individual users" },
+        "professional": { "name": "Professional", "audience": "For regular users" },
+        "business": { "name": "Business", "audience": "For teams" }
+      }
+    },
+    "faq": {
+      "eyebrow": "Practical answers",
+      "title": "Frequently asked questions",
+      "description": "What teams need to know before their first comparison.",
+      "items": {
+        "formats": { "question": "Which schedule formats are supported?", "answer": "Nova Insight supports common planning formats including XER, MPP and PDF, with additional formats available in the comparison workspace." },
+        "comparison": { "question": "How does the comparison work?", "answer": "Upload a previous and current schedule. Nova aligns the activities, detects revisions and presents the changes, timing impacts and risks in a structured report." },
+        "security": { "question": "How is our schedule data handled?", "answer": "Files are processed securely on Microsoft Azure within EU-compatible frameworks and are not shared with third parties." },
+        "reports": { "question": "Can I export the findings?", "answer": "Yes. Supported plans include professional PDF reporting so findings can be shared with project stakeholders." },
+        "freePlan": { "question": "What is included in the Free plan?", "answer": "The Free plan includes one comparison, a basic report and standard support. No credit card is required to start." },
+        "installation": { "question": "Do I need to install or integrate anything?", "answer": "No. Nova Insight runs in the browser, so teams can start without installing desktop software or setting up an integration." }
+      }
+    },
+    "finalCta": {
+      "eyebrow": "Your next revision can be clearer",
+      "title": "Save time. Reduce risk. Gain clarity.",
+      "description": "Join project professionals who use Nova Insight to understand every change.",
+      "button": "Start for free",
+      "note": "No credit card required"
+    },
+    "footer": {
+      "description": "Clearer construction schedule decisions, from revision to report.",
+      "productLabel": "Product links",
+      "legalLabel": "Legal links",
+      "product": "Product",
+      "legal": "Legal",
+      "contact": "Contact",
+      "location": "Copenhagen, Denmark",
+      "azure": "Securely built on Microsoft Azure"
+    }
   },
   "scheduleAnalysis": {
     "analysis": "Analysis",
