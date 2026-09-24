@@ -38,13 +38,18 @@ if replit_domains:
         if domain:
             ALLOWED_ORIGINS.append(f"https://{domain}")
 
+ALLOWED_ORIGINS.append(re.compile(r"^https://[a-z0-9-]+\.novainsight\.net$"))
+
 CORS(app,
      origins=ALLOWED_ORIGINS,
      allow_headers=[
-         'Content-Type', 'Authorization', 'X-Requested-With'
+         'Content-Type', 'Authorization', 'X-Requested-With', 'X-Company-Subdomain'
      ],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      supports_credentials=True)
+
+from utils.tenant import resolve_tenant
+app.before_request(resolve_tenant)
 
 from middleware.rate_limiter import register_rate_limiters
 register_rate_limiters(app)
@@ -584,6 +589,13 @@ def initialize_app():
     # Seed admin user for production
     print("Checking admin user...")
     seed_admin_user()
+
+    from utils.database import migrate_company_subdomains
+    print("Migrating company subdomains...")
+    if migrate_company_subdomains():
+        print("✅ Company subdomains ready")
+    else:
+        print("❌ Company subdomain migration failed")
     
     from app_auth_routes import register_auth_routes
     register_auth_routes(app)

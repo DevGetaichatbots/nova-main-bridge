@@ -7,6 +7,7 @@ import FormAlert from "./auth/FormAlert";
 import PasswordField from "./auth/PasswordField";
 import { handleApiError } from "../utils/errorHandler";
 import { buildPostAuthNavigation } from "../utils/authRedirect";
+import { crossHostRedirect } from "../utils/hostAccess";
 
 const Login = ({ setUser }) => {
   const { t } = useTranslation();
@@ -110,6 +111,7 @@ const Login = ({ setUser }) => {
       if (data.access_token) localStorage.setItem("accessToken", data.access_token);
       setUser?.(data.user);
       window.dispatchEvent(new Event("authChange"));
+      if (crossHostRedirect(data.redirectUrl)) return;
       const postAuth = buildPostAuthNavigation(location.state);
       navigate(postAuth.to, { state: postAuth.state });
     } catch (error) {

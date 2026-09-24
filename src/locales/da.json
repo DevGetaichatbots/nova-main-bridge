@@ -707,6 +707,8 @@
     "companyName": "Virksomhedsnavn",
     "companyNamePlaceholder": "Acme Corporation",
     "companyNameRequired": "Virksomhedsnavn er påkrævet",
+    "subdomain": "Virksomhedsadresse",
+    "subdomainPlaceholder": "acme",
     "cvrNumber": "CVR-nummer",
     "cvrPlaceholder": "12345678",
     "companySize": "Virksomhedsstørrelse",

@@ -8,6 +8,7 @@ import PasswordField from "./auth/PasswordField";
 import PasswordRequirements from "./auth/PasswordRequirements";
 import { resolvePostAuthRoute } from "../utils/authRedirect";
 import { handleApiError } from "../utils/errorHandler";
+import { crossHostRedirect, slugifySubdomain } from "../utils/hostAccess";
 
 const Signup = ({ setUser }) => {
   const { t } = useTranslation();
@@ -16,11 +17,13 @@ const Signup = ({ setUser }) => {
   const fieldRefs = useRef({});
   const [formData, setFormData] = useState({
     companyName: "",
+    subdomain: "",
     email: "",
     password: "",
     confirmPassword: "",
     acceptTerms: false,
   });
+  const [subdomainEdited, setSubdomainEdited] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -32,10 +35,13 @@ const Signup = ({ setUser }) => {
 
   const updateField = (event) => {
     const { name, value, type, checked } = event.target;
-    setFormData((current) => ({
-      ...current,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    setFormData((current) => {
+      const next = { ...current, [name]: type === "checkbox" ? checked : value };
+      if (name === "companyName" && !subdomainEdited) next.subdomain = slugifySubdomain(value);
+      if (name === "subdomain") next.subdomain = value.toLowerCase();
+      return next;
+    });
+    if (name === "subdomain") setSubdomainEdited(true);
     if (errors[name]) setErrors((current) => ({ ...current, [name]: "" }));
   };
 
@@ -97,6 +103,8 @@ const Signup = ({ setUser }) => {
 
       const payload = {
         companyName: formData.companyName,
+        // Unedited → let the backend pick a free, non-reserved subdomain from the name.
+        subdomain: subdomainEdited ? formData.subdomain : undefined,
         email: formData.email,
         password: formData.password,
         confirmPassword: formData.confirmPassword,
@@ -112,7 +120,9 @@ const Signup = ({ setUser }) => {
 
       if (!data.success) {
         const message = data.error || data.message || t("companySignup.signupError");
-        setErrors((current) => ({ ...current, general: message }));
+        const field = /^SUBDOMAIN_(TAKEN|RESERVED|INVALID)$/.test(data.code) ? "subdomain" : "general";
+        setErrors((current) => ({ ...current, [field]: message }));
+        if (field === "subdomain") fieldRefs.current.subdomain?.focus();
         if (response.status !== 400 && response.status !== 401) {
           await handleApiError(
             { message, status: response.status },
@@ -127,7 +137,7 @@ const Signup = ({ setUser }) => {
       setUser?.(data.user);
       window.dispatchEvent(new Event("authChange"));
 
-      navigate("/company-portal");
+      if (!crossHostRedirect(data.redirectUrl)) navigate("/company-portal");
     } catch (error) {
       const message = error.message?.includes("fetch")
         ? t("signup.connectionError")
@@ -160,6 +170,19 @@ const Signup = ({ setUser }) => {
           required
           onChange={updateField}
           onBlur={validateOnBlur}
+        />
+
+        <AuthField
+          ref={(node) => { fieldRefs.current.subdomain = node; }}
+          label={t("companySignup.subdomain")}
+          name="subdomain"
+          type="text"
+          autoComplete="off"
+          value={formData.subdomain}
+          error={errors.subdomain}
+          hint={`${formData.subdomain || t("companySignup.subdomainPlaceholder")}.novainsight.net`}
+          placeholder={t("companySignup.subdomainPlaceholder")}
+          onChange={updateField}
         />
 
         <AuthField

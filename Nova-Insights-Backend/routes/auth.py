@@ -11,6 +11,7 @@ from utils.token_manager import (
     verify_refresh_token
 )
 from utils.audit_logger import log_audit_event
+from utils.tenant import build_redirect_url
 from utils.redis_client import cache_get, cache_set, cache_delete
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
@@ -27,6 +28,17 @@ def get_cookie_settings():
         'secure': is_secure,
         'samesite': 'None' if is_secure else 'Lax',
     }
+
+
+def set_auth_cookies(resp, access_token, refresh_token):
+    """Attach HttpOnly access/refresh cookies (shared by login and company registration)."""
+    cookie_settings = get_cookie_settings()
+    resp.set_cookie('accessToken', access_token, httponly=True,
+                    secure=cookie_settings['secure'], samesite=cookie_settings['samesite'],
+                    max_age=86400, path='/')
+    resp.set_cookie('refreshToken', refresh_token, httponly=True,
+                    secure=cookie_settings['secure'], samesite=cookie_settings['samesite'],
+                    max_age=604800, path='/api/')
 
 
 @auth_bp.route('/login', methods=['POST'])
@@ -74,7 +86,8 @@ def login():
                     """
                     SELECT u.id, u.first_name, u.last_name, u.email, u.password_hash, u.role, 
                            u.company_id, u.is_active, u.created_at,
-                           c.name as company_name, c.cvr_number, c.is_active as company_active
+                           c.name as company_name, c.cvr_number, c.is_active as company_active,
+                           c.subdomain as company_subdomain
                     FROM users u
                     LEFT JOIN companies c ON u.company_id = c.id
                     WHERE u.email = %s
@@ -111,7 +124,7 @@ def login():
                         'code': 'INVALID_CREDENTIALS'
                     }), 401
                 
-                access_token = generate_access_token(user['id'], user['email'])
+                access_token = generate_access_token(user['id'], user['email'], company_id=user.get('company_id'))
                 refresh_token = generate_refresh_token(user['id'], user['email'])
                 
                 refresh_token_hash = hash_token(refresh_token)
@@ -142,6 +155,7 @@ def login():
                     'email': user['email'],
                     'role': user['role'] or 'user',
                     'companyId': user.get('company_id'),
+                    'companySubdomain': user.get('company_subdomain'),
                     'createdAt': user['created_at'].isoformat()
                 }
                 
@@ -156,31 +170,13 @@ def login():
                     'success': True,
                     'message': t('auth.login_success'),
                     'user': user_response,
-                    'access_token': access_token
+                    'access_token': access_token,
+                    'redirectUrl': build_redirect_url(user.get('company_subdomain'), user['role'])
                 }
                 
                 resp = jsonify(response_data)
                 
-                cookie_settings = get_cookie_settings()
-                
-                resp.set_cookie(
-                    'accessToken',
-                    access_token,
-                    httponly=True,
-                    secure=cookie_settings['secure'],
-                    samesite=cookie_settings['samesite'],
-                    max_age=86400,
-                    path='/'
-                )
-                resp.set_cookie(
-                    'refreshToken',
-                    refresh_token,
-                    httponly=True,
-                    secure=cookie_settings['secure'],
-                    samesite=cookie_settings['samesite'],
-                    max_age=604800,
-                    path='/api/'
-                )
+                set_auth_cookies(resp, access_token, refresh_token)
                 
                 return resp, 200
                 
@@ -267,9 +263,9 @@ def get_current_user():
                     SELECT u.id, u.first_name, u.last_name, u.email, u.role, 
                            u.company_id, u.phone_number, u.is_active, u.created_at, u.updated_at,
                            c.name as company_name, c.cvr_number, c.email as company_email,
-                           c.phone as company_phone, c.website as company_website,
+                           c.phone_number as company_phone, c.website as company_website,
                            c.address as company_address, c.industry as company_industry,
-                           c.is_active as company_active
+                           c.is_active as company_active, c.subdomain as company_subdomain
                     FROM users u
                     LEFT JOIN companies c ON u.company_id = c.id
                     WHERE u.id = %s
@@ -300,6 +296,7 @@ def get_current_user():
                     'role': user['role'] or 'user',
                     'phoneNumber': user.get('phone_number'),
                     'companyId': user.get('company_id'),
+                    'companySubdomain': user.get('company_subdomain'),
                     'isActive': user.get('is_active', True),
                     'createdAt': user['created_at'].isoformat() if user.get('created_at') else None,
                     'updatedAt': user['updated_at'].isoformat() if user.get('updated_at') else None

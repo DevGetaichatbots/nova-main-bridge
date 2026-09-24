@@ -1,4 +1,5 @@
 import re
+import unicodedata
 
 
 def validate_email(email):
@@ -73,3 +74,43 @@ def validate_name(name, field_name="Navn"):
         return False, f"{field_name} må ikke indeholde tal"
 
     return True, None
+
+
+
+RESERVED_SUBDOMAINS = frozenset({
+    'www', 'api', 'app', 'admin', 'dashboard', 'auth', 'login', 'mail', 'support',
+    'help', 'docs', 'blog', 'status', 'static', 'cdn', 'dev', 'staging', 'test',
+})
+_SUBDOMAIN_RE = re.compile(r'^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$')
+_DANISH = str.maketrans({'æ': 'ae', 'ø': 'oe', 'å': 'aa'})
+
+
+def slugify(name):
+    """Company name -> DNS-label-safe slug ('' when nothing usable is left)."""
+    s = (name or '').lower().translate(_DANISH)
+    s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode()
+    s = re.sub(r'[^a-z0-9]+', '-', s).strip('-')
+    return s[:63].strip('-')
+
+
+def validate_subdomain(value):
+    """Return (ok, error_code)."""
+    if not _SUBDOMAIN_RE.match(value or ''):
+        return False, 'SUBDOMAIN_INVALID'
+    if value in RESERVED_SUBDOMAINS:
+        return False, 'SUBDOMAIN_RESERVED'
+    return True, None
+
+
+def unique_subdomain(cur, base):
+    """First free subdomain: base, base-2, base-3, ... ('company' if base is unusable)."""
+    if not validate_subdomain(base)[0]:
+        base = 'company'
+    candidate, n = base, 1
+    while True:
+        cur.execute("SELECT 1 FROM companies WHERE subdomain = %s", (candidate,))
+        if not cur.fetchone():
+            return candidate
+        n += 1
+        suffix = f'-{n}'
+        candidate = base[:63 - len(suffix)] + suffix

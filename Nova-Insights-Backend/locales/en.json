@@ -116,7 +116,12 @@
     "cannot_delete_owner": "Cannot delete company owner",
     "cannot_delete_platform_owner": "Cannot delete platform owner company",
     "cannot_modify_platform_owner": "Cannot modify platform owner company",
-    "dashboard_load_failed": "Failed to load dashboard"
+    "dashboard_load_failed": "Failed to load dashboard",
+    "subdomain_taken": "This subdomain is already in use",
+    "subdomain_reserved": "This subdomain is reserved",
+    "subdomain_invalid": "Subdomain must be 3-63 characters: lowercase letters, numbers and hyphens",
+    "tenant_mismatch": "You do not have access to this company",
+    "inactive": "This company is deactivated"
   },
   "chat": {
     "session_not_found": "Session not found",

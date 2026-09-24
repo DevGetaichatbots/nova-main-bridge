@@ -189,3 +189,40 @@ def init_database():
         return False
     finally:
         conn.close()
+
+
+def migrate_company_subdomains():
+    """Add slug/subdomain/status to companies, backfill missing subdomains, add unique indexes."""
+    from utils.validators import slugify, unique_subdomain
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                ALTER TABLE companies ADD COLUMN IF NOT EXISTS slug VARCHAR(63);
+                ALTER TABLE companies ADD COLUMN IF NOT EXISTS subdomain VARCHAR(63);
+                ALTER TABLE companies ADD COLUMN IF NOT EXISTS status VARCHAR(20)
+                    GENERATED ALWAYS AS (CASE WHEN is_active THEN 'active' ELSE 'inactive' END) STORED;
+            """)
+        # Commit the columns on their own: login selects c.subdomain, so a later
+        # backfill/index failure must not roll them back.
+        conn.commit()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id, name FROM companies WHERE subdomain IS NULL ORDER BY id")
+            for row in cur.fetchall():
+                sub = unique_subdomain(cur, slugify(row['name']))
+                cur.execute("UPDATE companies SET slug = %s, subdomain = %s WHERE id = %s",
+                            (sub, sub, row['id']))
+            cur.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_slug ON companies(slug);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_subdomain ON companies(subdomain);
+            """)
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        print(f"Company subdomain migration error: {e}")
+        return False
+    finally:
+        conn.close()

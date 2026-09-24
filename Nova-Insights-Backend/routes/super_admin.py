@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify
 from functools import wraps
 from utils.database import get_db_connection
 from utils.i18n import t
+from utils.validators import slugify, unique_subdomain
 from utils.token_manager import verify_access_token, revoke_user_sessions
 from utils.redis_client import cache_delete
 from psycopg2.extras import RealDictCursor
@@ -425,10 +426,11 @@ def create_company():
                         'code': 'OWNER_EMAIL_EXISTS'
                     }), 400
                 
+                subdomain = unique_subdomain(cur, slugify(name))
                 cur.execute("""
-                    INSERT INTO companies (name, email, cvr_number, phone_number, website, 
-                                           address, industry, size, is_active)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO companies (name, email, cvr_number, phone_number, website,
+                                           address, industry, size, is_active, subdomain, slug)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id, name, email, created_at
                 """, (
                     name, email,
@@ -438,7 +440,7 @@ def create_company():
                     data.get('address', '').strip() or None,
                     data.get('industry', '').strip() or None,
                     data.get('size', '').strip() or None,
-                    True
+                    True, subdomain, subdomain
                 ))
                 new_company = cur.fetchone()
                 

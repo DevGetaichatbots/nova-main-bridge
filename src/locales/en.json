@@ -705,6 +705,8 @@
     "companyName": "Company name",
     "companyNamePlaceholder": "Acme Corporation",
     "companyNameRequired": "Company name is required",
+    "subdomain": "Company address",
+    "subdomainPlaceholder": "acme",
     "cvrNumber": "CVR number",
     "cvrPlaceholder": "12345678",
     "companySize": "Company size",

@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from './apiConfig';
+import { getApiBaseUrl } from './apiConfig.js';
 
 export const fetchWithAuth = async (url, options = {}) => {
   const token = localStorage.getItem('accessToken');
@@ -92,4 +92,20 @@ export const uploadFilesWithAuth = async (endpoint, formData, options = {}) => {
   }
 
   return response;
+};
+
+// localStorage is per-origin: after a redirect to {tenant}.novainsight.net the API cookie is
+// still valid but the new origin has no stored user. Restore it from /api/me.
+export const rehydrateSession = async (base = getApiBaseUrl()) => {
+  try {
+    const response = await fetch(`${base}/api/me`, { credentials: "include" });
+    if (!response.ok) return false;
+    const data = await response.json();
+    if (!data.success || !data.user) return false;
+    localStorage.setItem("user", JSON.stringify(data.user));
+    window.dispatchEvent(new Event("authChange"));
+    return true;
+  } catch {
+    return false;
+  }
 };

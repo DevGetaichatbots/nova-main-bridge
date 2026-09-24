@@ -548,11 +548,13 @@ def create_analysis():
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
-                SELECT id, analysis_id FROM schedule_analyses WHERE analysis_id = %s
+                SELECT id, analysis_id, user_id FROM schedule_analyses WHERE analysis_id = %s
             """, (analysis_id,))
             existing = cur.fetchone()
             if existing:
-                return jsonify({'success': True, 'analysis': existing})
+                if existing['user_id'] != user['user_id']:
+                    return jsonify({'success': False, 'error': t('common.access_denied')}), 403
+                return jsonify({'success': True, 'analysis': {'id': existing['id'], 'analysis_id': existing['analysis_id']}})
 
             cur.execute("""
                 INSERT INTO schedule_analyses (analysis_id, user_id, company_id, title, status)
@@ -581,22 +583,27 @@ def get_analysis(analysis_id):
     if not user:
         return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
 
-    cache_key = f"schedule_analysis:{analysis_id}"
-    cached = cache_get(cache_key)
-    if cached:
-        try:
-            cached_response = json.loads(cached)
-            cached_response['cached'] = True
-            return jsonify(cached_response), 200
-        except Exception:
-            pass
-
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'error': t('common.db_error')}), 500
 
+    cache_key = f"schedule_analysis:{analysis_id}"
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT 1 FROM schedule_analyses WHERE analysis_id = %s AND user_id = %s",
+                        (analysis_id, user['user_id']))
+            if not cur.fetchone():
+                return jsonify({'success': False, 'error': t('schedule.analysis_not_found')}), 404
+
+            cached = cache_get(cache_key)
+            if cached:
+                try:
+                    cached_response = json.loads(cached)
+                    cached_response['cached'] = True
+                    return jsonify(cached_response), 200
+                except Exception:
+                    pass
+
             cur.execute("""
                 SELECT id, analysis_id, title, filename, reference_date, status,
                        processing_time, model, language, predictive_insights,
@@ -1772,8 +1779,8 @@ def generate_comparison(comparison_id):
                 SET old_file_data = COALESCE(sc.old_file_data, ssf.old_file_data),
                     new_file_data = COALESCE(sc.new_file_data, ssf.new_file_data)
                 FROM session_source_files ssf
-                WHERE sc.comparison_id = %s AND sc.user_id = %s AND ssf.session_id = %s
-            """, (comparison_id, user['user_id'], session_id))
+                WHERE sc.comparison_id = %s AND sc.user_id = %s AND ssf.session_id = %s AND ssf.user_id = %s
+            """, (comparison_id, user['user_id'], session_id, user['user_id']))
             conn.commit()
     except Exception as e:
         conn.rollback()

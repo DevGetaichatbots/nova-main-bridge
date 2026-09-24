@@ -407,16 +407,6 @@ def get_messages(session_id):
     if not user:
         return jsonify({'success': False, 'error': t('common.unauthorized')}), 401
     
-    cache_key = f"messages:{session_id}"
-    cached_data = cache_get(cache_key)
-    if cached_data:
-        try:
-            cached_response = json.loads(cached_data)
-            cached_response['cached'] = True
-            return jsonify(cached_response), 200
-        except:
-            pass
-    
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'error': t('common.db_connection_failed')}), 500
@@ -443,6 +433,17 @@ def get_messages(session_id):
             
             if not (is_owner or is_company_admin or is_super_admin):
                 return jsonify({'success': False, 'error': t('common.access_denied')}), 403
+
+            # Cache is served only after the access check above.
+            cache_key = f"messages:{session_id}"
+            cached_data = cache_get(cache_key)
+            if cached_data:
+                try:
+                    cached_response = json.loads(cached_data)
+                    cached_response['cached'] = True
+                    return jsonify(cached_response), 200
+                except:
+                    pass
             
             cur.execute("""
                 SELECT id, sender_type, content, content_type, is_html, metadata, created_at
@@ -1519,8 +1520,9 @@ def download_session_pdf(session_id):
                 FROM task_annotations ta
                 LEFT JOIN users u ON ta.user_id = u.id
                 WHERE ta.session_id = %s
+                  AND (ta.is_private = FALSE OR ta.user_id = %s)
                 ORDER BY ta.task_key, ta.created_at
-            """, (session['id'],))
+            """, (session['id'], user['user_id']))
             
             annotations_raw = cur.fetchall()
             annotations = {}
@@ -1701,7 +1703,8 @@ def _cache_session_source_files(session_id, user_id, company_id, request_files):
                 SET old_file_data = COALESCE(EXCLUDED.old_file_data, session_source_files.old_file_data),
                     new_file_data = COALESCE(EXCLUDED.new_file_data, session_source_files.new_file_data),
                     old_filename = COALESCE(EXCLUDED.old_filename, session_source_files.old_filename),
-                    new_filename = COALESCE(EXCLUDED.new_filename, session_source_files.new_filename);
+                    new_filename = COALESCE(EXCLUDED.new_filename, session_source_files.new_filename)
+                WHERE session_source_files.user_id = EXCLUDED.user_id;
             """, (session_id, old_bytes, new_bytes, old_fn, new_fn, company_id, user_id))
             conn.commit()
     except Exception as e:

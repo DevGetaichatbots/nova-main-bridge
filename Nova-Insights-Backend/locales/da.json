@@ -116,7 +116,12 @@
     "cannot_delete_owner": "Kan ikke slette virksomhedsejeren",
     "cannot_delete_platform_owner": "Kan ikke slette platformsejerens virksomhed",
     "cannot_modify_platform_owner": "Kan ikke ændre platformsejerens virksomhed",
-    "dashboard_load_failed": "Kunne ikke indlæse dashboard"
+    "dashboard_load_failed": "Kunne ikke indlæse dashboard",
+    "subdomain_taken": "Dette subdomæne er allerede i brug",
+    "subdomain_reserved": "Dette subdomæne er reserveret",
+    "subdomain_invalid": "Subdomænet skal være 3-63 tegn: små bogstaver, tal og bindestreger",
+    "tenant_mismatch": "Du har ikke adgang til denne virksomhed",
+    "inactive": "Denne virksomhed er deaktiveret"
   },
   "chat": {
     "session_not_found": "Session ikke fundet",

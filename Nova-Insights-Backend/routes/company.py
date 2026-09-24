@@ -7,7 +7,9 @@ import bcrypt
 import json
 from utils.database import get_db_connection
 from utils.i18n import t
-from utils.validators import validate_email, validate_password, validate_name
+import psycopg2
+from utils.validators import validate_email, validate_password, validate_name, slugify, validate_subdomain, unique_subdomain
+from utils.tenant import build_redirect_url
 from utils.token_manager import (
     generate_access_token, 
     generate_refresh_token, 
@@ -16,6 +18,7 @@ from utils.token_manager import (
 from utils.audit_logger import log_audit_event
 from utils.redis_client import cache_get, cache_set, cache_delete
 from middleware.auth_middleware import require_auth
+from routes.auth import set_auth_cookies
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
 
@@ -142,12 +145,14 @@ def register_company():
         company_phone = data.get('companyPhone', '').strip() if data.get('companyPhone') else None
         company_email = data.get('companyEmail', '').strip() if data.get('companyEmail') else None
         
-        first_name = data.get('firstName', '').strip() if data.get('firstName') else None
-        last_name = data.get('lastName', '').strip() if data.get('lastName') else None
+        # users.first_name/last_name are NOT NULL; the signup form doesn't collect names.
+        first_name = (data.get('firstName') or '').strip()
+        last_name = (data.get('lastName') or '').strip()
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
         confirm_password = data.get('confirmPassword', '')
         owner_phone = data.get('phoneNumber', '').strip() if data.get('phoneNumber') else None
+        requested_subdomain = (data.get('subdomain') or '').strip().lower() or None
         
         if not company_name:
             return jsonify({
@@ -179,6 +184,12 @@ def register_company():
                 'error': t('password.mismatch'),
                 'code': 'PASSWORD_MISMATCH'
             }), 400
+
+        if requested_subdomain:
+            ok, code = validate_subdomain(requested_subdomain)
+            if not ok:
+                key = 'company.subdomain_reserved' if code == 'SUBDOMAIN_RESERVED' else 'company.subdomain_invalid'
+                return jsonify({'success': False, 'error': t(key), 'code': code}), 400
         
         conn = get_db_connection()
         if not conn:
@@ -206,15 +217,38 @@ def register_company():
                             'error': t('company.cvr_exists'),
                             'code': 'CVR_EXISTS'
                         }), 400
+
+                cur.execute("SELECT 1 FROM companies WHERE LOWER(name) = LOWER(%s)", (company_name,))
+                if cur.fetchone():
+                    return jsonify({
+                        'success': False,
+                        'error': t('company.name_exists'),
+                        'code': 'COMPANY_EXISTS'
+                    }), 409
+
+                if requested_subdomain:
+                    cur.execute("SELECT 1 FROM companies WHERE subdomain = %s", (requested_subdomain,))
+                    if cur.fetchone():
+                        return jsonify({
+                            'success': False,
+                            'error': t('company.subdomain_taken'),
+                            'code': 'SUBDOMAIN_TAKEN'
+                        }), 409
+                    subdomain = requested_subdomain
+                else:
+                    subdomain = unique_subdomain(cur, slugify(company_name))
                 
                 cur.execute(
                     """
-                    INSERT INTO companies (name, cvr_number, address, website, industry, size, phone_number, email)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id, name, cvr_number, address, website, industry, size, phone_number, email, created_at
+                    INSERT INTO companies (name, cvr_number, address, website, industry, size, phone_number, email,
+                                           subdomain, slug)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, name, cvr_number, address, website, industry, size, phone_number, email,
+                              subdomain, created_at
                     """,
-                    (company_name, cvr_number, company_address, company_website, 
-                     company_industry, company_size, company_phone, company_email or email)
+                    (company_name, cvr_number, company_address, company_website,
+                     company_industry, company_size, company_phone, company_email or email,
+                     subdomain, subdomain)
                 )
                 new_company = cur.fetchone()
                 
@@ -235,7 +269,7 @@ def register_company():
                 )
                 new_user = cur.fetchone()
                 
-                access_token = generate_access_token(new_user['id'], new_user['email'])
+                access_token = generate_access_token(new_user['id'], new_user['email'], company_id=new_company['id'])
                 refresh_token = generate_refresh_token(new_user['id'], new_user['email'])
                 
                 refresh_token_hash = hash_token(refresh_token)
@@ -253,12 +287,13 @@ def register_company():
                 
                 display_name = f"{first_name or ''} {last_name or ''}".strip() or company_name
                 
-                return jsonify({
+                resp = jsonify({
                     'success': True,
                     'message': t('company.registered'),
                     'company': {
                         'id': new_company['id'],
                         'name': new_company['name'],
+                        'subdomain': new_company['subdomain'],
                         'cvrNumber': new_company['cvr_number'],
                         'address': new_company['address'],
                         'website': new_company['website'],
@@ -277,12 +312,21 @@ def register_company():
                         'role': new_user['role'],
                         'companyId': new_user['company_id'],
                         'companyName': company_name,
+                        'companySubdomain': new_company['subdomain'],
                         'createdAt': new_user['created_at'].isoformat()
                     },
-                    'accessToken': access_token,
-                    'refreshToken': refresh_token
-                }), 201
-                
+                    'redirectUrl': build_redirect_url(new_company['subdomain'], new_user['role'])
+                })
+                set_auth_cookies(resp, access_token, refresh_token)
+                return resp, 201
+
+        except psycopg2.errors.UniqueViolation:
+            conn.rollback()
+            return jsonify({
+                'success': False,
+                'error': t('company.subdomain_taken'),
+                'code': 'SUBDOMAIN_TAKEN'
+            }), 409
         except Exception as e:
             conn.rollback()
             print(f"Company registration error: {e}")

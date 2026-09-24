@@ -25,7 +25,7 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 RESET_TOKEN_EXPIRE_MINUTES = 15
 
 
-def generate_access_token(user_id, email):
+def generate_access_token(user_id, email, company_id=None):
     """Generate JWT access token"""
     payload = {
         'user_id': user_id,
@@ -35,6 +35,8 @@ def generate_access_token(user_id, email):
         'exp': datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
         'iat': datetime.utcnow()
     }
+    if company_id is not None:
+        payload['company_id'] = company_id
     token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
     return token
 
