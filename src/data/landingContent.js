@@ -1,7 +1,6 @@
 export const integrationLogos = [
   { name: "Primavera P6", logo: "/landing/logos/primavera-p6.svg", variant: "wordmark" },
   { name: "Microsoft Project", logo: "/landing/logos/microsoft-project.svg" },
-  { name: "Oracle", logo: "/landing/logos/oracle.svg", variant: "wordmark-only" },
   { name: "Asta Powerproject", logo: "/landing/logos/asta-powerproject.svg" },
   { name: "TILOS", logo: "/landing/logos/trimble-tilos.svg", parentBrand: "Trimble" },
 ];

@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Footer from "./Footer";
+import MarketingFooter from "./landing/MarketingFooter";
 import Navbar from "./Navbar";
 
 const TermsOfServicePage = ({ user, setUser }) => {
@@ -291,7 +291,7 @@ const TermsOfServicePage = ({ user, setUser }) => {
         </div>
       </div>
 
-      <Footer />
+      <MarketingFooter />
     </div>
   );
 };

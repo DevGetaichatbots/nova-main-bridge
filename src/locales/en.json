@@ -1237,6 +1237,8 @@
       "description": "Clearer construction schedule decisions, from revision to report.",
       "productLabel": "Product links",
       "legalLabel": "Legal links",
+      "companyLabel": "Company links",
+      "company": "Company",
       "product": "Product",
       "legal": "Legal",
       "contact": "Contact",

@@ -13,7 +13,7 @@ import {
 
 // Always-eager: rendered on every page or needed for auth gating
 import Navbar from "./components/Navbar";
-import Footer from "./components/Footer";
+import MarketingFooter from "./components/landing/MarketingFooter";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import CompanyOwnerRoute from "./components/CompanyOwnerRoute";
@@ -2340,7 +2340,7 @@ function App() {
                     <div className="flex-1">
                       <UpdateProfile />
                     </div>
-                    <Footer />
+                    <MarketingFooter />
                   </div>
                 </ProtectedRoute>
               </RestrictedSubdomainRedirect>
@@ -2355,7 +2355,7 @@ function App() {
                   <div className="flex-1">
                     <Support />
                   </div>
-                  <Footer />
+                  <MarketingFooter />
                 </div>
               </ProtectedRoute>
             }
@@ -2427,7 +2427,7 @@ function App() {
                     <div className="flex-1">
                       <AdminPortal />
                     </div>
-                    <Footer />
+                    <MarketingFooter />
                   </div>
                 </AdminRoute>
               </RestrictedSubdomainRedirect>
@@ -2509,7 +2509,7 @@ function App() {
                     <div className="flex-1">
                       <CompanyPortal />
                     </div>
-                    <Footer />
+                    <MarketingFooter />
                   </div>
                 </CompanyOwnerRoute>
               </RestrictedSubdomainRedirect>
@@ -2527,7 +2527,7 @@ function App() {
                     <div className="flex-1">
                       <SuperAdminPortal />
                     </div>
-                    <Footer />
+                    <MarketingFooter />
                   </div>
                 </SuperAdminRoute>
               </RestrictedSubdomainRedirect>

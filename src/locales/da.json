@@ -1239,6 +1239,8 @@
       "description": "Klarere beslutninger om byggetidsplaner – fra revision til rapport.",
       "productLabel": "Produktlinks",
       "legalLabel": "Juridiske links",
+      "companyLabel": "Virksomhedslinks",
+      "company": "Virksomhed",
       "product": "Produkt",
       "legal": "Juridisk",
       "contact": "Kontakt",

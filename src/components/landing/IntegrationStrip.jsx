@@ -17,12 +17,10 @@ const IntegrationStrip = () => {
               className={`integration-logo integration-logo--${integration.variant || "icon"}`}
             >
               <img src={integration.logo} alt={integration.name} loading="lazy" />
-              {integration.variant !== "wordmark-only" && (
-                <span aria-hidden="true">
-                  {integration.parentBrand && <small>{integration.parentBrand}</small>}
-                  {integration.name}
-                </span>
-              )}
+              <span aria-hidden="true">
+                {integration.parentBrand && <small>{integration.parentBrand}</small>}
+                {integration.name}
+              </span>
             </div>
           ))}
           <span className="integration-strip__more">{t("landing.integrations.more")}</span>

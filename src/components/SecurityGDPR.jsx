@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Footer from "./Footer";
+import MarketingFooter from "./landing/MarketingFooter";
 import Navbar from "./Navbar";
 
 const SecurityGDPR = ({ user, setUser }) => {
@@ -289,7 +289,7 @@ const SecurityGDPR = ({ user, setUser }) => {
         </div>
       </div>
 
-      <Footer />
+      <MarketingFooter />
     </div>
   );
 };

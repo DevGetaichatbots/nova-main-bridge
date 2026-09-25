@@ -203,6 +203,10 @@
   display: inline-flex;
 }
 
+.marketing-header__brand .brand-mark {
+  height: 48px;
+}
+
 .marketing-header__desktop-nav {
   display: flex;
   align-items: center;
@@ -516,8 +520,7 @@
   flex: 0 0 auto;
 }
 
-.integration-logo--wordmark img,
-.integration-logo--wordmark-only img {
+.integration-logo--wordmark img {
   width: 72px;
   height: 24px;
 }
@@ -1149,12 +1152,13 @@
   padding: 72px 0 26px;
   background: #17212b;
   color: #b9c8d0;
+  font-family: "Outfit", sans-serif;
 }
 
 .marketing-footer__grid {
   display: grid;
-  grid-template-columns: 1.5fr 0.7fr 0.8fr 1fr;
-  gap: 64px;
+  grid-template-columns: 1.4fr 0.7fr 0.6fr 0.8fr 1fr;
+  gap: 48px;
 }
 
 .marketing-footer__brand p {
@@ -1185,7 +1189,24 @@
 }
 
 .marketing-footer a:hover {
-  color: var(--color-brand-light);
+  color: #38bdf8;
+}
+
+.marketing-footer__meta {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.marketing-footer__social {
+  display: flex;
+  gap: 14px;
+}
+
+.marketing-footer__social svg {
+  display: block;
+  width: 18px;
+  height: 18px;
 }
 
 .marketing-footer__bottom {
@@ -1217,6 +1238,7 @@
 }
 
 @media (max-width: 900px) {
+  .marketing-header__brand .brand-mark { height: 34px; }
   .marketing-header__desktop-nav,
   .marketing-header__login,
   .marketing-header__cta { display: none; }
